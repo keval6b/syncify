@@ -7,7 +7,9 @@ from syncify2.common.conf import base_uri
 
 scope = "playlist-read-private,playlist-modify-private,user-library-read,playlist-modify-public"
 oauth = spotipy.oauth2.SpotifyOAuth(
-    scope=scope, redirect_uri=base_uri + "/api/v1/auth/callback"
+    scope=scope,
+    redirect_uri=base_uri + "/api/v1/auth/callback",
+    requests_timeout=10,
 )
 
 

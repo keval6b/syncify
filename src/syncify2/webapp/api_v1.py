@@ -43,7 +43,21 @@ async def callback(
 ):
     if request.query_params.get("state") != session_data.state:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Invalid state")
-    token_response = spotify.oauth.get_access_token(request.query_params.get("code"), check_cache=False)
+    try:
+        token_response = spotify.oauth.get_access_token(
+            request.query_params.get("code"), check_cache=False
+        )
+    except ConnectionError:
+        # Any unexpected failure from the OAuth library
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            "Failed to complete Spotify authentication. Please retry.",
+        )
+    if not token_response or "access_token" not in token_response:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            "Invalid response from Spotify during authentication.",
+        )
     import spotipy
 
     client = spotipy.Spotify(auth=token_response["access_token"])
