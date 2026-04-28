@@ -44,6 +44,6 @@
     "tw-animate-css": "^1.2.5",
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.24.1",
-    "vite": "7.1.11"
+    "vite": "8.0.10"
   }
 }
