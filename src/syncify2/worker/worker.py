@@ -27,6 +27,12 @@ def run():
             db_session.merge(request)
             db_session.commit()
 
+        if count == 0:
+            request.completed = func.now()
+            db_session.merge(request)
+            db_session.commit()
+            return
+
         print(f"Starting request {request.id} with {count} songs for {request.user_id}")
         for progress in spotify.sync(client):
             request.progress = progress / (

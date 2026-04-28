@@ -23,6 +23,8 @@ def run():
         for user in users:
             client = spotify.get_client(user.id, db_session, commit=False)
             liked_count = spotify.get_liked_count(client)
+            if liked_count == 0:
+                continue
             new_requests.append(db.SyncRequest(user_id=user.id, song_count=liked_count))
 
         db_session.add_all(new_requests)

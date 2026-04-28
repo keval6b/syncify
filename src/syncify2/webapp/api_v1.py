@@ -117,6 +117,8 @@ def enqueue(
         )
     client = spotify.get_client(session_data.user_id, db_session)
     count = spotify.get_liked_count(client)
+    if count == 0:
+        return
     sync_request = SyncRequest(user_id=session_data.user_id, song_count=count)
     db_session.add(sync_request)
     db_session.commit()
