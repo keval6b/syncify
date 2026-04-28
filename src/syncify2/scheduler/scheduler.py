@@ -22,6 +22,8 @@ def run():
         new_requests = []
         for user in users:
             client = spotify.get_client(user.id, db_session, commit=False)
+            if client is None:
+                continue
             liked_count = spotify.get_liked_count(client)
             if liked_count == 0:
                 continue

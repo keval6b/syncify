@@ -116,6 +116,8 @@ def enqueue(
             status.HTTP_400_BAD_REQUEST, "You already have a pending sync request"
         )
     client = spotify.get_client(session_data.user_id, db_session)
+    if client is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not logged in")
     count = spotify.get_liked_count(client)
     if count == 0:
         return

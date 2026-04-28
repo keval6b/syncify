@@ -1,9 +1,10 @@
 import { createFileRoute, Navigate, Outlet } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { getUser } from "@/lib/api/queries.ts";
+import { ApiError, getUser } from "@/lib/api/queries.ts";
 import { LoaderCircle } from "lucide-react";
 import {useEffect} from "react";
 import posthog from "posthog-js";
+import {toast} from "sonner";
 
 export const Route = createFileRoute("/_authenticated")({
   component: RouteComponent,
@@ -21,6 +22,13 @@ function RouteComponent() {
     if (!userQuery.data?.id) return;
     posthog.identify(userQuery.data.id);
   }, [userQuery.data?.id]);
+
+  useEffect(() => {
+    if (!userQuery.isError) return;
+    if (userQuery.error instanceof ApiError && userQuery.error.status === 401) {
+      toast("Session expired. Please log in again.");
+    }
+  }, [userQuery.error, userQuery.isError]);
 
   if (userQuery.isLoading) {
     return (

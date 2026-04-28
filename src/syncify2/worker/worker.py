@@ -20,6 +20,11 @@ def run():
             return
 
         client = spotify.get_client(request.user_id, db_session)
+        if client is None:
+            request.completed = func.now()
+            db_session.merge(request)
+            db_session.commit()
+            return
 
         count = spotify.get_liked_count(client)
         if count != request.song_count:

@@ -20,14 +20,19 @@ def get_client(
     if user is None:
         print(f"user {user_id} not found")
         return None
-    response = oauth.refresh_access_token(user.refresh_token)
-    if not response:
+    try:
+        response = oauth.refresh_access_token(user.refresh_token)
+    except Exception as exc:
+        print(f"failed to refresh for user {user_id}: {exc}")
+        return None
+    if not response or "access_token" not in response:
         print(f"failed to refresh for user {user_id}")
         return None
-    user.refresh_token = response["refresh_token"]
-    db_session.merge(user)
-    if commit:
-        db_session.commit()
+    if "refresh_token" in response:
+        user.refresh_token = response["refresh_token"]
+        db_session.merge(user)
+        if commit:
+            db_session.commit()
     return Spotify(response.get("access_token"))
 
 
