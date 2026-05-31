@@ -33,14 +33,6 @@ def _clear_cookie(response: Response, cookie_name: str):
     response.delete_cookie(key=cookie_name, httponly=True, secure=True, samesite="lax")
 
 
-@router.get("/posthog")
-def posthog_config():
-    return {
-        "host": posthog.host,
-        "public_key": posthog.api_key,
-    }
-
-
 def _redirect_uri(request: Request) -> str:
     return f"https://{request.headers['host']}/api/v1/auth/callback"
 

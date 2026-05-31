@@ -10,11 +10,14 @@ env:
 jobs:
   build-frontend:
     runs-on: ubuntu-latest
+    environment: prd
     steps:
       - uses: actions/checkout@v4
 
       - name: Build frontend
         working-directory: frontend
+        env:
+          VITE_POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
         run: |
           npm install -g pnpm
           pnpm install --frozen-lockfile
