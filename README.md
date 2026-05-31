@@ -1,48 +1,78 @@
 # Syncify
 
-A tool that copies your "Liked Songs" to a regular playlist that you can make public and/or share with your friends.
+Syncify copies your Spotify "Liked Songs" to a regular playlist that can be made public and shared with friends. Spotify has never offered this natively, so here we are.
 
-For some reason doing this has always been impossible; it has bugged me for years. I finally decided to fix it myself.
+It syncs automatically every 24 hours. You can also trigger a sync manually at any time.
 
-## Usage
+**Live at [syncify.keval6b.com](https://syncify.keval6b.com)**
 
-1. Go to [https://syncify.keval6b.com](https://syncify.keval6b.com)
-2. Press "Login with Spotify"
-3. When prompted, allow access
-4. Press the "Enqueue Sync" button
-5. Wait (it takes about 20 seconds to synchronize ~1250 Liked Songs)
-6. Check your library for your new playlist(s)
+## How it works
 
-The tool updates the same playlists by name every time you sync, so if you want to keep an iteration just rename it and a new one will be created next time.
+1. Log in with Spotify and grant access
+2. Press "Sync Now" to copy your liked songs into a playlist (or wait for the automatic 24-hour sync)
+3. Find your new playlist in your Spotify library
 
-While you have an account, your liked songs are synced automatically every 24 hours.
+Playlists are matched by name, so renaming one causes a fresh playlist to be created on the next sync — useful for keeping snapshots.
 
 ## Architecture
 
-Syncify runs on AWS serverless infrastructure:
+Fully serverless on AWS, running at roughly $1-5/month.
 
-- **Frontend** — React SPA on S3 behind CloudFront
-- **API** — FastAPI on Lambda (arm64), session auth via signed JWT cookies
-- **Worker** — separate Lambda (reserved concurrency 1) triggered by SQS, handles the Spotify sync
-- **Scheduling** — per-user EventBridge Schedule (rate 24h) sends an SQS message for each user automatically
-- **Database** — DynamoDB (users + sync requests, 1 year TTL on requests)
+- **Frontend** — React SPA (Vite, TanStack Router/Query) deployed to S3 behind CloudFront
+- **API** — FastAPI + Mangum on Lambda (arm64), JWT cookie sessions
+- **Worker** — separate Lambda with reserved concurrency of 1, triggered by SQS
+- **Scheduling** — one EventBridge Schedule per user (rate 24h) feeds the SQS queue automatically; created on signup, deleted on account deletion or revoked Spotify access
+- **Database** — DynamoDB; sync request history expires after 1 year via TTL
 - **IaC** — Terraform in `infra/`
-- **CI/CD** — GitHub Actions deploys on push to `main`
+- **CI/CD** — GitHub Actions deploys on push to `main` using OIDC (no stored AWS keys)
 
-## Deploying
+## Deploying your own instance
 
-Set the following secrets in the `prd` GitHub environment:
+### Prerequisites
+
+- AWS account
+- Spotify app ([create one here](https://developer.spotify.com/dashboard)) with a redirect URI you'll add after the first deploy
+- Terraform >= 1.9
+- A GitHub repo with Actions enabled
+
+### 1. Create a Terraform state bucket
+
+Create an S3 bucket in your target region for Terraform state, then update `infra/versions.tf` with your bucket name and region.
+
+### 2. Create a GitHub Actions deploy role
+
+Create an IAM role trusted by GitHub Actions OIDC (`token.actions.githubusercontent.com`) and scoped to your repository and the `prd` environment. Attach the following AWS managed policies:
+
+- `AWSLambda_FullAccess`
+- `AmazonDynamoDBFullAccess`
+- `AmazonSQSFullAccess`
+- `AmazonS3FullAccess`
+- `CloudFrontFullAccess`
+- `AmazonEventBridgeFullAccess`
+- `AmazonEventBridgeSchedulerFullAccess`
+- `CloudWatchFullAccess`
+- `AmazonSNSFullAccess`
+
+For IAM (needed to manage Lambda execution roles), attach a custom policy scoped to `arn:aws:iam::*:role/syncify-*` covering `iam:CreateRole`, `iam:DeleteRole`, `iam:GetRole`, `iam:TagRole`, `iam:PutRolePolicy`, `iam:DeleteRolePolicy`, `iam:GetRolePolicy`, `iam:ListRolePolicies`, `iam:ListAttachedRolePolicies`, and `iam:PassRole` (the latter conditioned on `iam:PassedToService` of `lambda.amazonaws.com` and `scheduler.amazonaws.com`).
+
+### 3. Configure GitHub environment secrets
+
+Create a `prd` environment in your GitHub repo settings and add the following secrets:
 
 | Secret | Description |
 |---|---|
-| `AWS_DEPLOY_ROLE_ARN` | IAM role ARN for the GitHub Actions OIDC deploy role |
+| `AWS_DEPLOY_ROLE_ARN` | ARN of the deploy role created above |
 | `SPOTIPY_CLIENT_ID` | Spotify app client ID |
 | `SPOTIPY_CLIENT_SECRET` | Spotify app client secret |
-| `JWT_SECRET` | Random secret for signing session cookies (`openssl rand -hex 32`) |
-| `POSTHOG_API_KEY` | PostHog API key (optional) |
+| `JWT_SECRET` | Secret for signing session cookies — generate with `openssl rand -hex 32` |
+| `POSTHOG_API_KEY` | PostHog API key (optional, analytics) |
 
-Push to `main` to deploy. On first deploy:
+### 4. Deploy
 
-1. Create the Terraform state bucket (`syncify-tfstate-661355305324-eu-west-2-an`) if it doesn't exist
-2. Add your custom domain and ACM certificate to the CloudFront distribution manually after the first apply
-3. Register `https://syncify.keval6b.com/api/v1/auth/callback` as a redirect URI in the Spotify Developer Dashboard
+Push to `main`. The workflow will build the frontend, package the Lambda layer, run `terraform apply`, sync the frontend to S3, and invalidate the CloudFront cache.
+
+### 5. First-time setup after deploy
+
+1. **Custom domain** — add your domain and an ACM certificate to the CloudFront distribution in the AWS console
+2. **Spotify redirect URI** — register `https://your-domain.com/api/v1/auth/callback` in your Spotify app's settings
+3. **SNS alerts** — subscribe to the `syncify-alarms` SNS topic in AWS to receive email alerts for Lambda errors and worker failures
