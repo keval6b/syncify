@@ -39,7 +39,7 @@ function Dashboard() {
     refetchInterval: (q) => {
       const jobs = q.state.data ?? [];
       if (jobs.some((job) => !job.completed)) {
-        return 1000;
+        return 3000;
       }
       return 30000;
     },
