@@ -62,6 +62,9 @@ jobs:
             --query LayerVersionArn --output text)
           echo "arn=$LAYER_ARN" >> "$GITHUB_OUTPUT"
 
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v4
+
       - name: Terraform apply
         working-directory: infra
         env:
