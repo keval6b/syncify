@@ -9,35 +9,35 @@ It syncs automatically every 24 hours. You can also trigger a sync manually at a
 ## How it works
 
 1. Log in with Spotify and grant access
-2. Press "Sync Now" to copy your liked songs into a playlist (or wait for the automatic 24-hour sync)
+2. Press "Enqueue Sync" to copy your liked songs into a playlist (or wait for the automatic 24-hour sync)
 3. Find your new playlist in your Spotify library
 
-Playlists are matched by name, so renaming one causes a fresh playlist to be created on the next sync — useful for keeping snapshots.
+Playlists are matched by name, so renaming one causes a fresh playlist to be created on the next sync, which is useful for keeping snapshots.
 
 ## Architecture
 
 Fully serverless on AWS, running at roughly $1-5/month.
 
 - **Frontend** — React SPA (Vite, TanStack Router/Query) deployed to S3 behind CloudFront
-- **API** — FastAPI + Mangum on Lambda (arm64), JWT cookie sessions
+- **API** — FastAPI + Mangum on Lambda (arm64), behind API Gateway HTTP API (rate limited: 20 req/s, burst 50), JWT cookie sessions
 - **Worker** — separate Lambda with reserved concurrency of 1, triggered by SQS
-- **Scheduling** — one EventBridge Schedule per user (rate 24h) feeds the SQS queue automatically; created on signup, deleted on account deletion or revoked Spotify access
+- **Scheduling** — one EventBridge Schedule per user (rate 24h) feeds the SQS queue automatically; created on signup and deleted on account deletion or revoked Spotify access
 - **Database** — DynamoDB; sync request history expires after 1 year via TTL
 - **IaC** — Terraform in `infra/`
-- **CI/CD** — GitHub Actions deploys on push to `main` using OIDC (no stored AWS keys)
+- **CI/CD** — GitHub Actions deploys on push to `main` using OIDC (no stored AWS keys); frontend and Lambda layer builds run in parallel
 
 ## Deploying your own instance
 
 ### Prerequisites
 
 - AWS account
-- Spotify app ([create one here](https://developer.spotify.com/dashboard)) with a redirect URI you'll add after the first deploy
+- Spotify app ([create one here](https://developer.spotify.com/dashboard)) with a redirect URI you will add after the first deploy
 - Terraform >= 1.9
 - A GitHub repo with Actions enabled
 
 ### 1. Create a Terraform state bucket
 
-Create an S3 bucket in your target region for Terraform state, then update `infra/versions.tf` with your bucket name and region.
+Create an S3 bucket in your target region for Terraform state, then update the `bucket`, `key`, and `region` in `infra/versions.tf`.
 
 ### 2. Create a GitHub Actions deploy role
 
@@ -65,15 +65,15 @@ Create a `prd` environment in your GitHub repo settings and add the following se
 | `AWS_DEPLOY_ROLE_ARN` | ARN of the deploy role created above |
 | `SPOTIPY_CLIENT_ID` | Spotify app client ID |
 | `SPOTIPY_CLIENT_SECRET` | Spotify app client secret |
-| `JWT_SECRET` | Secret for signing session cookies — generate with `openssl rand -hex 32` |
-| `POSTHOG_API_KEY` | PostHog API key (optional, analytics) |
+| `JWT_SECRET` | Secret for signing session cookies; generate with `openssl rand -hex 32` |
+| `POSTHOG_API_KEY` | PostHog API key (optional; used for both frontend analytics and server-side event capture) |
 
 ### 4. Deploy
 
-Push to `main`. The workflow will build the frontend, package the Lambda layer, run `terraform apply`, sync the frontend to S3, and invalidate the CloudFront cache.
+Push to `main`. The workflow builds the frontend (with PostHog key baked in as a `VITE_` variable) and the Lambda dependency layer in parallel, then runs `terraform apply`, syncs the frontend to S3, and invalidates the CloudFront cache.
 
 ### 5. First-time setup after deploy
 
-1. **Custom domain** — add your domain and an ACM certificate to the CloudFront distribution in the AWS console
+1. **Custom domain** — add your domain and ACM certificate to the CloudFront distribution in the AWS console; Terraform is configured to ignore these fields on subsequent deploys
 2. **Spotify redirect URI** — register `https://your-domain.com/api/v1/auth/callback` in your Spotify app's settings
 3. **SNS alerts** — subscribe to the `syncify-alarms` SNS topic in AWS to receive email alerts for Lambda errors and worker failures
