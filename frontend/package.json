@@ -28,13 +28,6 @@
     "tailwind-merge": "^3.1.0",
     "tailwindcss": "^4.1.0"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@swc/core",
-      "core-js",
-      "esbuild"
-    ]
-  },
   "devDependencies": {
     "@eslint/js": "^9.21.0",
     "@tanstack/eslint-plugin-query": "^5.71.5",
