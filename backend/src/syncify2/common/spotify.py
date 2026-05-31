@@ -20,7 +20,7 @@ def get_client(user_id: str) -> Spotify | None:
         print(f"user {user_id} not found")
         return None
     try:
-        response = make_oauth("").refresh_access_token(user.refresh_token)
+        response = make_oauth("http://localhost").refresh_access_token(user.refresh_token)
     except Exception as exc:
         print(f"failed to refresh for user {user_id}: {exc}")
         return None
