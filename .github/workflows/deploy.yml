@@ -4,22 +4,35 @@ on:
   push:
     branches: [main]
 
-permissions:
-  id-token: write
-  contents: read
-
 env:
   AWS_REGION: eu-west-2
-  TF_VAR_spotify_client_id: ${{ secrets.SPOTIPY_CLIENT_ID }}
-  TF_VAR_spotify_client_secret: ${{ secrets.SPOTIPY_CLIENT_SECRET }}
-  TF_VAR_posthog_api_key: ${{ secrets.POSTHOG_API_KEY }}
-  TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
 
 jobs:
-  deploy:
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm install -g pnpm
+          pnpm install --frozen-lockfile
+          pnpm run build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+
+  build-layer:
     runs-on: ubuntu-latest
     environment: prd
-
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      layer_arn: ${{ steps.layer.outputs.arn }}
     steps:
       - uses: actions/checkout@v4
 
@@ -29,15 +42,7 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Build frontend
-        working-directory: frontend
-        run: |
-          npm install -g pnpm
-          pnpm install --frozen-lockfile
-          pnpm run build
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
 
       - name: Build Lambda dependency layer
         working-directory: backend
@@ -62,13 +67,37 @@ jobs:
             --query LayerVersionArn --output text)
           echo "arn=$LAYER_ARN" >> "$GITHUB_OUTPUT"
 
-      - name: Install Terraform
-        uses: hashicorp/setup-terraform@v4
+  deploy:
+    needs: [build-frontend, build-layer]
+    runs-on: ubuntu-latest
+    environment: prd
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      TF_VAR_spotify_client_id: ${{ secrets.SPOTIPY_CLIENT_ID }}
+      TF_VAR_spotify_client_secret: ${{ secrets.SPOTIPY_CLIENT_SECRET }}
+      TF_VAR_posthog_api_key: ${{ secrets.POSTHOG_API_KEY }}
+      TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+      TF_VAR_lambda_layer_arn: ${{ needs.build-layer.outputs.layer_arn }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+
+      - uses: hashicorp/setup-terraform@v4
 
       - name: Terraform apply
         working-directory: infra
-        env:
-          TF_VAR_lambda_layer_arn: ${{ steps.layer.outputs.arn }}
         run: |
           terraform init -input=false
           terraform apply -auto-approve -input=false
