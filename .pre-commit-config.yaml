@@ -7,12 +7,6 @@ repos:
       - id: check-yaml
       - id: check-added-large-files
 
-  - repo: https://github.com/psf/black
-    rev: 25.1.0
-    hooks:
-      - id: black
-        files: ^backend/
-
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.11.10
     hooks:
@@ -20,11 +14,11 @@ repos:
         args: [--fix]
         files: ^backend/
 
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v3.1.0
-    hooks:
-      - id: prettier
-        files: ^frontend/
+  -   repo: https://github.com/34j/mirrors-prettier
+      rev: v3.8.3
+      hooks:
+        -   id: prettier
+            files: ^frontend/
 
   - repo: local
     hooks:
