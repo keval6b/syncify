@@ -62,7 +62,10 @@ export async function getUser(): Promise<User> {
 }
 
 export async function handleLogin() {
-  const response = await fetch("/api/v1/auth/login");
+  const redirectUri = `${window.location.origin}/api/v1/auth/callback`;
+  const response = await fetch(
+    `/api/v1/auth/login?redirect_uri=${encodeURIComponent(redirectUri)}`,
+  );
   if (response.ok) {
     window.location.assign(await response.json());
   } else {

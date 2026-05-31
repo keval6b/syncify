@@ -33,14 +33,9 @@ def _clear_cookie(response: Response, cookie_name: str):
     response.delete_cookie(key=cookie_name, httponly=True, secure=True, samesite="lax")
 
 
-def _redirect_uri(request: Request) -> str:
-    return f"https://{request.headers['host']}/api/v1/auth/callback"
-
-
 @router.get("/auth/login")
-def login(request: Request, response: Response) -> str:
+def login(request: Request, response: Response, redirect_uri: str) -> str:
     state = secrets.token_urlsafe()
-    redirect_uri = _redirect_uri(request)
     _set_session_cookie(
         response,
         session.create_oauth_token(state, redirect_uri),
