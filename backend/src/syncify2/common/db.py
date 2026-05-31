@@ -1,4 +1,5 @@
 import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 import boto3
@@ -164,8 +165,10 @@ class SyncSlotTakenError(Exception):
     pass
 
 
-def claim_sync_slot(user_id: str):
-    """Atomically claim the sync slot. Raises SyncSlotTakenError if already claimed.
+@contextmanager
+def sync_slot(user_id: str):
+    """Atomically claim the sync slot for the duration of the block.
+    Raises SyncSlotTakenError if already claimed.
     TTL is 20 min so a crashed Lambda auto-releases within one slot window."""
     expiry = int((datetime.now(timezone.utc) + timedelta(minutes=20)).timestamp())
     try:
@@ -175,10 +178,10 @@ def claim_sync_slot(user_id: str):
         )
     except _requests_table.meta.client.exceptions.ConditionalCheckFailedException:
         raise SyncSlotTakenError
-
-
-def release_sync_slot(user_id: str):
-    _requests_table.delete_item(Key={"userId": user_id, "requestId": _LOCK_SK})
+    try:
+        yield
+    finally:
+        _requests_table.delete_item(Key={"userId": user_id, "requestId": _LOCK_SK})
 
 
 def complete_request(user_id: str, request_id: str):

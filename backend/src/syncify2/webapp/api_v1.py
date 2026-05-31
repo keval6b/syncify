@@ -134,17 +134,18 @@ def enqueue(request: Request):
         return
 
     try:
-        db.claim_sync_slot(user_id)
+        with db.sync_slot(user_id):
+            sync_request = db.create_request(user_id, count)
+            _sqs.send_message(
+                QueueUrl=conf.sqs_queue_url,
+                MessageBody=json.dumps(
+                    {"user_id": user_id, "request_id": sync_request.id}
+                ),
+            )
     except db.SyncSlotTakenError:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, "You already have a pending sync request"
         )
-
-    sync_request = db.create_request(user_id, count)
-    _sqs.send_message(
-        QueueUrl=conf.sqs_queue_url,
-        MessageBody=json.dumps({"user_id": user_id, "request_id": sync_request.id}),
-    )
     posthog.capture(
         "enqueued_sync_request",
         distinct_id=user_id,
