@@ -11,6 +11,7 @@ def make_oauth(redirect_uri: str) -> spotipy.oauth2.SpotifyOAuth:
         scope=_SCOPE,
         redirect_uri=redirect_uri,
         requests_timeout=10,
+        cache_handler=spotipy.cache_handler.MemoryCacheHandler(),
     )
 
 

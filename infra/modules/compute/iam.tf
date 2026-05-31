@@ -40,7 +40,7 @@ resource "aws_iam_role_policy" "api" {
       },
       {
         Effect   = "Allow"
-        Action   = ["scheduler:CreateSchedule"]
+        Action   = ["scheduler:CreateSchedule", "scheduler:DeleteSchedule"]
         Resource = "arn:aws:scheduler:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:schedule/syncify-users/*"
       },
       {
