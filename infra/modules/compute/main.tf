@@ -104,26 +104,6 @@ resource "aws_scheduler_schedule_group" "users" {
   name = "syncify-users"
 }
 
-# --- Warm ping: EventBridge fires every 10 min to keep API Lambda warm ---
-resource "aws_cloudwatch_event_rule" "warm_ping" {
-  name                = "syncify-warm-ping"
-  schedule_expression = "rate(10 minutes)"
-}
-
-resource "aws_cloudwatch_event_target" "warm_ping" {
-  rule  = aws_cloudwatch_event_rule.warm_ping.name
-  arn   = aws_lambda_function.api.arn
-  input = jsonencode({ source = "warm-ping" })
-}
-
-resource "aws_lambda_permission" "warm_ping" {
-  statement_id  = "AllowWarmPingInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.api.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.warm_ping.arn
-}
-
 # --- CloudWatch Alarms ---
 resource "aws_sns_topic" "alarms" {
   name = "syncify-alarms"
