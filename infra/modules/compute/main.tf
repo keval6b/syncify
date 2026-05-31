@@ -13,7 +13,7 @@ locals {
   }
 
   # Lambda source: zip the src/ directory (deps come from the layer)
-  source_dir  = "${path.root}/../backend/src"
+  source_dir = "${path.root}/../backend/src"
 }
 
 data "archive_file" "source" {
@@ -35,8 +35,6 @@ resource "aws_lambda_function" "api" {
   source_code_hash = data.archive_file.source.output_base64sha256
   layers           = [var.lambda_layer_arn]
   environment { variables = local.common_env }
-
-  tags = { service = "syncify", environment = var.environment }
 }
 
 resource "aws_lambda_function_url" "api" {
@@ -58,8 +56,6 @@ resource "aws_lambda_function" "worker" {
   source_code_hash               = data.archive_file.source.output_base64sha256
   layers                         = [var.lambda_layer_arn]
   environment { variables = local.common_env }
-
-  tags = { service = "syncify", environment = var.environment }
 }
 
 resource "aws_lambda_event_source_mapping" "worker_sqs" {
@@ -73,14 +69,12 @@ resource "aws_lambda_event_source_mapping" "worker_sqs" {
 # --- EventBridge Schedule Group (one schedule per user lives here) ---
 resource "aws_scheduler_schedule_group" "users" {
   name = "syncify-users"
-  tags = { service = "syncify", environment = var.environment }
 }
 
 # --- Warm ping: EventBridge fires every 10 min to keep API Lambda warm ---
 resource "aws_cloudwatch_event_rule" "warm_ping" {
   name                = "syncify-warm-ping"
   schedule_expression = "rate(10 minutes)"
-  tags                = { service = "syncify", environment = var.environment }
 }
 
 resource "aws_cloudwatch_event_target" "warm_ping" {
@@ -100,7 +94,6 @@ resource "aws_lambda_permission" "warm_ping" {
 # --- CloudWatch Alarms ---
 resource "aws_sns_topic" "alarms" {
   name = "syncify-alarms"
-  tags = { service = "syncify", environment = var.environment }
 }
 
 resource "aws_cloudwatch_metric_alarm" "dlq_depth" {

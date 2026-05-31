@@ -21,4 +21,11 @@ terraform {
 
 provider "aws" {
   region = var.aws_region
+
+  default_tags {
+    tags = {
+      service     = "syncify"
+      environment = var.environment
+    }
+  }
 }

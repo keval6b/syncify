@@ -1,16 +1,13 @@
 module "database" {
-  source      = "./modules/database"
-  environment = var.environment
+  source = "./modules/database"
 }
 
 module "queue" {
-  source      = "./modules/queue"
-  environment = var.environment
+  source = "./modules/queue"
 }
 
 module "frontend" {
-  source      = "./modules/frontend"
-  environment = var.environment
+  source              = "./modules/frontend"
   api_lambda_url_host = module.compute.api_lambda_url_host
 }
 
@@ -28,10 +25,7 @@ module "compute" {
   sqs_queue_id  = module.queue.queue_id
   dlq_arn       = module.queue.dlq_arn
 
-  lambda_layer_arn = var.lambda_layer_arn
-
-
-
+  lambda_layer_arn      = var.lambda_layer_arn
   spotify_client_id     = var.spotify_client_id
   spotify_client_secret = var.spotify_client_secret
   posthog_api_key       = var.posthog_api_key

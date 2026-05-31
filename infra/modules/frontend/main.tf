@@ -1,11 +1,6 @@
 resource "aws_s3_bucket" "spa" {
   bucket_prefix = "syncify-spa-"
   force_destroy = true
-
-  tags = {
-    service     = "syncify"
-    environment = var.environment
-  }
 }
 
 resource "aws_s3_bucket_versioning" "spa" {
@@ -37,11 +32,6 @@ resource "aws_cloudfront_distribution" "cdn" {
   enabled             = true
   default_root_object = "index.html"
   price_class         = "PriceClass_100"
-
-  tags = {
-    service     = "syncify"
-    environment = var.environment
-  }
 
   origin {
     domain_name              = aws_s3_bucket.spa.bucket_regional_domain_name

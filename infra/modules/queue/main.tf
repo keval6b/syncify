@@ -1,11 +1,6 @@
 resource "aws_sqs_queue" "dlq" {
   name                      = "syncify-sync-dlq"
   message_retention_seconds = 1209600 # 14 days
-
-  tags = {
-    service     = "syncify"
-    environment = var.environment
-  }
 }
 
 resource "aws_sqs_queue" "sync" {
@@ -16,9 +11,4 @@ resource "aws_sqs_queue" "sync" {
     deadLetterTargetArn = aws_sqs_queue.dlq.arn
     maxReceiveCount     = 3
   })
-
-  tags = {
-    service     = "syncify"
-    environment = var.environment
-  }
 }

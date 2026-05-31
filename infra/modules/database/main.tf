@@ -7,11 +7,6 @@ resource "aws_dynamodb_table" "users" {
     name = "userId"
     type = "S"
   }
-
-  tags = {
-    service     = "syncify"
-    environment = var.environment
-  }
 }
 
 resource "aws_dynamodb_table" "sync_requests" {
@@ -33,10 +28,5 @@ resource "aws_dynamodb_table" "sync_requests" {
   ttl {
     attribute_name = "expiresAt"
     enabled        = true
-  }
-
-  tags = {
-    service     = "syncify"
-    environment = var.environment
   }
 }
