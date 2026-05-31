@@ -23,7 +23,7 @@ def _decode(token: str) -> dict:
     try:
         return jwt.decode(token, conf.jwt_secret, algorithms=[ALGORITHM])
     except JWTError:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Invalid or expired session")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired session")
 
 
 def create_oauth_token(state: str, redirect_uri: str) -> str:
@@ -50,8 +50,8 @@ def get_oauth_payload(request: Request) -> tuple[str, str]:
 def get_user_id(request: Request) -> str:
     token = request.cookies.get(COOKIE_SESSION)
     if not token:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not authenticated")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not authenticated")
     payload = _decode(token)
     if payload.get("type") != "user":
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Invalid session type")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid session type")
     return payload["user_id"]
