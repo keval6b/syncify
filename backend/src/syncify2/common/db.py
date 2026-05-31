@@ -1,6 +1,7 @@
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
+from decimal import Decimal
 from datetime import datetime, timezone, timedelta
 import boto3
 from boto3.dynamodb.conditions import Attr
@@ -146,7 +147,7 @@ def update_request_progress(user_id: str, request_id: str, progress: float):
     _requests_table.update_item(
         Key={"userId": user_id, "requestId": request_id},
         UpdateExpression="SET progress = :p",
-        ExpressionAttributeValues={":p": progress},
+        ExpressionAttributeValues={":p": Decimal(str(progress))},
     )
 
 
