@@ -16,6 +16,8 @@ def _schedule_name(user_id: str) -> str:
 
 
 def create_user_schedule(user_id: str):
+    # Delete first so this is idempotent — also resets the 24h window on re-login.
+    delete_user_schedule(user_id)
     _scheduler.create_schedule(
         GroupName=SCHEDULE_GROUP,
         Name=_schedule_name(user_id),

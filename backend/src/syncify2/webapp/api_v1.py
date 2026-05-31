@@ -83,11 +83,8 @@ def callback(request: Request):
     user = client.current_user()
     user_id = user["id"]
 
-    is_new_user = db.get_user(user_id) is None
     db.put_user(db.User(id=user_id, refresh_token=token_response["refresh_token"]))
-
-    if is_new_user:
-        scheduling.create_user_schedule(user_id)
+    scheduling.create_user_schedule(user_id)
 
     redirect = RedirectResponse("/dashboard", status_code=status.HTTP_302_FOUND)
     _clear_cookie(redirect, session.COOKIE_OAUTH)
@@ -128,11 +125,6 @@ def delete_user(request: Request, response: Response):
 def enqueue(request: Request):
     user_id = session.get_user_id(request)
 
-    if db.get_pending_request(user_id):
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, "You already have a pending sync request"
-        )
-
     client = spotify.get_client(user_id)
     if client is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not logged in")
@@ -140,6 +132,13 @@ def enqueue(request: Request):
     count = spotify.get_liked_count(client)
     if count == 0:
         return
+
+    try:
+        db.claim_sync_slot(user_id)
+    except db.SyncSlotTakenError:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "You already have a pending sync request"
+        )
 
     sync_request = db.create_request(user_id, count)
     _sqs.send_message(

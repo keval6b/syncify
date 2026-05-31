@@ -157,6 +157,30 @@ def update_request_song_count(user_id: str, request_id: str, song_count: int):
     )
 
 
+_LOCK_SK = "#lock"
+
+
+class SyncSlotTakenError(Exception):
+    pass
+
+
+def claim_sync_slot(user_id: str):
+    """Atomically claim the sync slot. Raises SyncSlotTakenError if already claimed.
+    TTL is 20 min so a crashed Lambda auto-releases within one slot window."""
+    expiry = int((datetime.now(timezone.utc) + timedelta(minutes=20)).timestamp())
+    try:
+        _requests_table.put_item(
+            Item={"userId": user_id, "requestId": _LOCK_SK, "expiresAt": expiry},
+            ConditionExpression="attribute_not_exists(requestId)",
+        )
+    except _requests_table.meta.client.exceptions.ConditionalCheckFailedException:
+        raise SyncSlotTakenError
+
+
+def release_sync_slot(user_id: str):
+    _requests_table.delete_item(Key={"userId": user_id, "requestId": _LOCK_SK})
+
+
 def complete_request(user_id: str, request_id: str):
     _requests_table.update_item(
         Key={"userId": user_id, "requestId": request_id},

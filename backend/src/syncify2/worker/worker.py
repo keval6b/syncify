@@ -11,15 +11,19 @@ def run_for_user(user_id: str, request_id: str | None = None):
         if not request or request.completed:
             return
     else:
-        # Scheduler path: check for existing pending sync first
-        if db.get_pending_request(user_id):
+        # Scheduler path: claim the slot atomically; skip if already running.
+        try:
+            db.claim_sync_slot(user_id)
+        except db.SyncSlotTakenError:
             return
         client = spotify.get_client(user_id)
         if client is None:
             scheduling.delete_user_schedule(user_id)
+            db.release_sync_slot(user_id)
             return
         count = spotify.get_liked_count(client)
         if count == 0:
+            db.release_sync_slot(user_id)
             return
         request = db.create_request(user_id, count)
 
@@ -28,6 +32,7 @@ def run_for_user(user_id: str, request_id: str | None = None):
     if client is None:
         scheduling.delete_user_schedule(user_id)
         db.complete_request(user_id, request.id)
+        db.release_sync_slot(user_id)
         return
 
     count = spotify.get_liked_count(client)
@@ -36,6 +41,7 @@ def run_for_user(user_id: str, request_id: str | None = None):
 
     if count == 0:
         db.complete_request(user_id, request.id)
+        db.release_sync_slot(user_id)
         return
 
     print(f"Starting request {request.id} with {count} songs for {user_id}")
@@ -43,6 +49,7 @@ def run_for_user(user_id: str, request_id: str | None = None):
         db.update_request_progress(user_id, request.id, progress / (count * 2))
 
     db.complete_request(user_id, request.id)
+    db.release_sync_slot(user_id)
     posthog.capture(
         "sync_complete",
         distinct_id=user_id,
