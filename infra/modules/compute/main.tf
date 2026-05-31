@@ -21,6 +21,17 @@ data "archive_file" "source" {
   output_path = "${path.module}/source.zip"
 }
 
+# --- CloudWatch Log Groups (created ahead of Lambdas to enforce retention) ---
+resource "aws_cloudwatch_log_group" "api" {
+  name              = "/aws/lambda/syncify-api"
+  retention_in_days = 90
+}
+
+resource "aws_cloudwatch_log_group" "worker" {
+  name              = "/aws/lambda/syncify-worker"
+  retention_in_days = 90
+}
+
 # --- API Lambda ---
 resource "aws_lambda_function" "api" {
   function_name    = "syncify-api"
@@ -34,6 +45,7 @@ resource "aws_lambda_function" "api" {
   source_code_hash = data.archive_file.source.output_base64sha256
   layers           = [var.lambda_layer_arn]
   environment { variables = local.common_env }
+  depends_on       = [aws_cloudwatch_log_group.api]
 }
 
 # --- API Gateway HTTP API ---
@@ -88,6 +100,7 @@ resource "aws_lambda_function" "worker" {
   source_code_hash               = data.archive_file.source.output_base64sha256
   layers                         = [var.lambda_layer_arn]
   environment { variables = local.common_env }
+  depends_on                     = [aws_cloudwatch_log_group.worker]
 }
 
 resource "aws_lambda_event_source_mapping" "worker_sqs" {

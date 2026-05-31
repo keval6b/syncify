@@ -33,8 +33,8 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _expiry_one_year() -> int:
-    return int((datetime.now(timezone.utc) + timedelta(days=365)).timestamp())
+def _expiry_thirty_days() -> int:
+    return int((datetime.now(timezone.utc) + timedelta(days=30)).timestamp())
 
 
 # --- Users ---
@@ -96,7 +96,7 @@ def create_request(user_id: str, song_count: int) -> SyncRequest:
             "songCount": song_count,
             "progress": 0,
             "createdAt": created_at,
-            "expiresAt": _expiry_one_year(),
+            "expiresAt": _expiry_thirty_days(),
         }
     )
     return SyncRequest(
@@ -137,10 +137,11 @@ def get_recent_requests(user_id: str, limit: int = 10) -> list[SyncRequest]:
         KeyConditionExpression="userId = :uid",
         ExpressionAttributeValues={":uid": user_id},
         ConsistentRead=True,
+        Limit=limit,
     )
     items = resp.get("Items", [])
     items.sort(key=lambda x: x.get("createdAt", ""), reverse=True)
-    return [_item_to_request(i) for i in items[:limit]]
+    return [_item_to_request(i) for i in items]
 
 
 def update_request_progress(user_id: str, request_id: str, progress: float):
