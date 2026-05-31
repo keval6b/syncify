@@ -10,6 +10,6 @@ output "cloudfront_distribution_id" {
   value = module.frontend.distribution_id
 }
 
-output "api_lambda_url" {
-  value = module.compute.api_lambda_url
+output "api_url" {
+  value = module.compute.api_url
 }

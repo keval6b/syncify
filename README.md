@@ -44,6 +44,7 @@ Create an S3 bucket in your target region for Terraform state, then update `infr
 Create an IAM role trusted by GitHub Actions OIDC (`token.actions.githubusercontent.com`) and scoped to your repository and the `prd` environment. Attach the following AWS managed policies:
 
 - `AWSLambda_FullAccess`
+- `AmazonAPIGatewayAdministrator`
 - `AmazonDynamoDBFullAccess`
 - `AmazonSQSFullAccess`
 - `AmazonS3FullAccess`
