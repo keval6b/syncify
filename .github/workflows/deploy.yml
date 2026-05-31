@@ -61,32 +61,12 @@ jobs:
             --query LayerVersionArn --output text)
           echo "arn=$LAYER_ARN" >> "$GITHUB_OUTPUT"
 
-      - name: Set base_uri from CloudFront domain
-        id: cf_domain
-        working-directory: infra
-        run: |
-          terraform init -input=false
-          DOMAIN=$(terraform output -raw cloudfront_domain 2>/dev/null || echo "")
-          if [ -n "$DOMAIN" ]; then
-            echo "TF_VAR_base_uri=https://$DOMAIN" >> "$GITHUB_ENV"
-          else
-            echo "TF_VAR_base_uri=https://placeholder.cloudfront.net" >> "$GITHUB_ENV"
-          fi
-
       - name: Terraform apply
         working-directory: infra
         env:
           TF_VAR_lambda_layer_arn: ${{ steps.layer.outputs.arn }}
         run: |
-          terraform apply -auto-approve -input=false
-
-      - name: Update base_uri with real CloudFront domain
-        working-directory: infra
-        env:
-          TF_VAR_lambda_layer_arn: ${{ steps.layer.outputs.arn }}
-        run: |
-          DOMAIN=$(terraform output -raw cloudfront_domain)
-          echo "TF_VAR_base_uri=https://$DOMAIN" >> "$GITHUB_ENV"
+          terraform init -input=false
           terraform apply -auto-approve -input=false
 
       - name: Sync frontend to S3

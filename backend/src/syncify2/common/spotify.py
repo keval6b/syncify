@@ -2,14 +2,16 @@ import spotipy
 from spotipy import Spotify
 
 from syncify2.common import db
-from syncify2.common.conf import base_uri
 
-scope = "playlist-read-private,playlist-modify-private,user-library-read,playlist-modify-public"
-oauth = spotipy.oauth2.SpotifyOAuth(
-    scope=scope,
-    redirect_uri=base_uri + "/api/v1/auth/callback",
-    requests_timeout=10,
-)
+_SCOPE = "playlist-read-private,playlist-modify-private,user-library-read,playlist-modify-public"
+
+
+def make_oauth(redirect_uri: str) -> spotipy.oauth2.SpotifyOAuth:
+    return spotipy.oauth2.SpotifyOAuth(
+        scope=_SCOPE,
+        redirect_uri=redirect_uri,
+        requests_timeout=10,
+    )
 
 
 def get_client(user_id: str) -> Spotify | None:

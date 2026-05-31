@@ -11,7 +11,6 @@ variable "sqs_queue_id" {}
 variable "dlq_arn" {}
 
 variable "lambda_layer_arn" {}
-variable "base_uri" {}
 
 variable "spotify_client_id" { sensitive = true }
 variable "spotify_client_secret" { sensitive = true }

@@ -31,7 +31,7 @@ module "compute" {
   lambda_layer_arn = var.lambda_layer_arn
 
 
-  base_uri              = var.base_uri
+
   spotify_client_id     = var.spotify_client_id
   spotify_client_secret = var.spotify_client_secret
   posthog_api_key       = var.posthog_api_key

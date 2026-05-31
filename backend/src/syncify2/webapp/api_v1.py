@@ -41,23 +41,31 @@ def posthog_config():
     }
 
 
+def _redirect_uri(request: Request) -> str:
+    return f"https://{request.headers['host']}/api/v1/auth/callback"
+
+
 @router.get("/auth/login")
-def login(response: Response) -> str:
+def login(request: Request, response: Response) -> str:
     state = secrets.token_urlsafe()
+    redirect_uri = _redirect_uri(request)
     _set_session_cookie(
-        response, session.create_oauth_token(state), session.COOKIE_OAUTH, 300
+        response,
+        session.create_oauth_token(state, redirect_uri),
+        session.COOKIE_OAUTH,
+        300,
     )
-    return spotify.oauth.get_authorize_url(state)
+    return spotify.make_oauth(redirect_uri).get_authorize_url(state)
 
 
 @router.get("/auth/callback")
 def callback(request: Request):
-    state = session.get_oauth_state(request)
+    state, redirect_uri = session.get_oauth_payload(request)
     if request.query_params.get("state") != state:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Invalid state")
 
     try:
-        token_response = spotify.oauth.get_access_token(
+        token_response = spotify.make_oauth(redirect_uri).get_access_token(
             request.query_params.get("code"), check_cache=False
         )
     except ConnectionError:

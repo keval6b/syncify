@@ -21,8 +21,6 @@ def _read_bool(name: str, default: bool = False) -> bool:
     return _read(name, default=str(default), optional=True).lower() == "true"
 
 
-base_uri = _read("BASE_URI", "http://127.0.0.1:5000").removesuffix("/")
-
 # JWT secret — must be stable across Lambda invocations (set as env var in prod)
 jwt_secret = _read("JWT_SECRET", default=secrets.token_hex())
 
@@ -40,4 +38,4 @@ schedule_role_arn = _read("SCHEDULE_ROLE_ARN", optional=True)
 # Analytics
 posthog.host = _read("POSTHOG_HOST", default="https://eu.i.posthog.com", optional=True)
 posthog.api_key = _read("POSTHOG_API_KEY", optional=True)
-posthog.debug = _read_bool("POSTHOG_DEBUG", default="127.0.0.1" in base_uri)
+posthog.debug = _read_bool("POSTHOG_DEBUG")

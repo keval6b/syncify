@@ -1,6 +1,5 @@
 locals {
   common_env = {
-    BASE_URI              = var.base_uri
     SPOTIPY_CLIENT_ID     = var.spotify_client_id
     SPOTIPY_CLIENT_SECRET = var.spotify_client_secret
     POSTHOG_API_KEY       = var.posthog_api_key
