@@ -12,11 +12,17 @@ export const Route = createRootRoute({
         </div>
         <footer className="py-6 flex flex-col items-center gap-2">
           <p className="flex items-center gap-1 text-sm text-muted-foreground">
-            Made with <Heart className="w-4 h-4 text-red-500 fill-red-500" /> by <a href="https://keval6b.com" target="_blank"
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">keval_6b</a>
+            Made with <Heart className="w-4 h-4 text-red-500 fill-red-500" /> by{" "}
+            <a
+              href="https://keval6b.com"
+              target="_blank"
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              keval_6b
+            </a>
           </p>
           <a
-            href="https://github.com/yottapanda/syncify"
+            href="https://github.com/keval6b/syncify"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
