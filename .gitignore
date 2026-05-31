@@ -1,11 +1,2 @@
-# IDE
 .idea/
-
-# Environment
-.env
-.cache
-
-# CI build artifacts (Lambda layer, Terraform archive)
-lambda_layer/
 lambda_layer.zip
-infra/modules/compute/source.zip

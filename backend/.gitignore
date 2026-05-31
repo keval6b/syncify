@@ -1,6 +1,5 @@
-node_modules/
 .venv/
 *.egg-info/
 __pycache__/
 build/
-*.pyc
+lambda_layer/
