@@ -57,7 +57,7 @@ jobs:
             --python-version 3.13 \
             --only-binary=:all: \
             --target lambda_layer/python
-          zip -r ../lambda_layer.zip lambda_layer/
+          (cd lambda_layer && zip -r ../../lambda_layer.zip .)
 
       - name: Publish Lambda layer
         id: layer
