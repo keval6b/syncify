@@ -28,7 +28,7 @@ resource "aws_lambda_function" "api" {
   role             = aws_iam_role.api.arn
   runtime          = "python3.13"
   architectures    = ["arm64"]
-  handler          = "syncify2.webapp.lambda_handler.handler"
+  handler          = "syncify2.api.lambda_handler.handler"
   timeout          = 29
   memory_size      = 512
   filename         = data.archive_file.source.output_path

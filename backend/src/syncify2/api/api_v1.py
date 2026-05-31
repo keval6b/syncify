@@ -10,8 +10,8 @@ from starlette.responses import Response, RedirectResponse
 
 from syncify2.common import spotify, db, conf
 from syncify2.common import scheduling
-from syncify2.webapp import session
-from syncify2.webapp.types import UserResponse
+from syncify2.api import session
+from syncify2.api.types import UserResponse
 
 router = APIRouter(prefix="/api/v1", tags=["API v1"])
 

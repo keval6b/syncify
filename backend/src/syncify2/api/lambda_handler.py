@@ -1,6 +1,6 @@
 from mangum import Mangum
 
-from syncify2.webapp.app import app
+from syncify2.api.app import app
 
 _handler = Mangum(app, lifespan="off")
 
