@@ -4,6 +4,8 @@ from syncify2.common import spotify, db, scheduling
 
 
 def run_for_user(user_id: str, request_id: str | None = None):
+    client = None
+
     if request_id:
         request = db.get_request(user_id, request_id)
         if not request or request.completed:
@@ -21,7 +23,8 @@ def run_for_user(user_id: str, request_id: str | None = None):
             return
         request = db.create_request(user_id, count)
 
-    client = spotify.get_client(user_id)
+    if client is None:
+        client = spotify.get_client(user_id)
     if client is None:
         scheduling.delete_user_schedule(user_id)
         db.complete_request(user_id, request.id)

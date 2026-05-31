@@ -145,7 +145,7 @@ def update_request_progress(user_id: str, request_id: str, progress: float):
     _requests_table.update_item(
         Key={"userId": user_id, "requestId": request_id},
         UpdateExpression="SET progress = :p",
-        ExpressionAttributeValues={":p": str(progress)},
+        ExpressionAttributeValues={":p": progress},
     )
 
 
