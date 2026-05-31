@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: prd
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Build frontend
         working-directory: frontend
@@ -23,7 +23,7 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm run build
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: frontend-dist
           path: frontend/dist/
@@ -37,7 +37,7 @@ jobs:
     outputs:
       layer_arn: ${{ steps.layer.outputs.arn }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v6
@@ -84,7 +84,7 @@ jobs:
       TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
       TF_VAR_lambda_layer_arn: ${{ needs.build-layer.outputs.layer_arn }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v6
@@ -92,7 +92,7 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: frontend-dist
           path: frontend/dist/
