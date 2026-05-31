@@ -3,7 +3,7 @@ variable "aws_region" {
 }
 
 variable "environment" {
-  default = "prod"
+  default = "prd"
 }
 
 variable "lambda_layer_arn" {

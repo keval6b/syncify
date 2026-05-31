@@ -31,7 +31,7 @@ def create_user_schedule(user_id: str):
         Tags=[
             {"Key": "service", "Value": "syncify"},
             {"Key": "user_id", "Value": user_id},
-            {"Key": "environment", "Value": os.environ.get("ENVIRONMENT", "prod")},
+            {"Key": "environment", "Value": os.environ.get("ENVIRONMENT", "prd")},
         ],
     )
 
