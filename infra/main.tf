@@ -12,8 +12,7 @@ module "frontend" {
 }
 
 module "compute" {
-  source      = "./modules/compute"
-  environment = var.environment
+  source = "./modules/compute"
 
   users_table_name    = module.database.users_table_name
   requests_table_name = module.database.requests_table_name

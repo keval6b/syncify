@@ -1,5 +1,4 @@
 import json
-import os
 import re
 
 import boto3
@@ -28,11 +27,6 @@ def create_user_schedule(user_id: str):
             "RoleArn": conf.schedule_role_arn,
             "Input": json.dumps({"user_id": user_id, "source": "scheduler"}),
         },
-        Tags=[
-            {"Key": "service", "Value": "syncify"},
-            {"Key": "user_id", "Value": user_id},
-            {"Key": "environment", "Value": os.environ.get("ENVIRONMENT", "prd")},
-        ],
     )
 
 

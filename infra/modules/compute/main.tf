@@ -9,7 +9,6 @@ locals {
     SQS_QUEUE_URL         = var.sqs_queue_url
     SQS_QUEUE_ARN         = var.sqs_queue_arn
     SCHEDULE_ROLE_ARN     = aws_iam_role.schedule_executor.arn
-    ENVIRONMENT           = var.environment
   }
 
   # Lambda source: zip the src/ directory (deps come from the layer)

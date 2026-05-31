@@ -1,5 +1,3 @@
-variable "environment" {}
-
 variable "users_table_name" {}
 variable "users_table_arn" {}
 variable "requests_table_name" {}
