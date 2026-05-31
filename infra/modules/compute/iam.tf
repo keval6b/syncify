@@ -31,7 +31,7 @@ resource "aws_iam_role_policy" "api" {
       {
         Effect   = "Allow"
         Action   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:Scan"]
-        Resource = [var.users_table_arn, var.requests_table_arn]
+        Resource = [var.users_table_arn, var.requests_table_arn, "${var.requests_table_arn}/index/*"]
       },
       {
         Effect   = "Allow"

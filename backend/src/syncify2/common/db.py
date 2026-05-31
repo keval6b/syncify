@@ -134,14 +134,13 @@ def get_pending_request(user_id: str) -> SyncRequest | None:
 
 def get_recent_requests(user_id: str, limit: int = 10) -> list[SyncRequest]:
     resp = _requests_table.query(
+        IndexName="byCreatedAt",
         KeyConditionExpression="userId = :uid",
         ExpressionAttributeValues={":uid": user_id},
-        ConsistentRead=True,
+        ScanIndexForward=False,
         Limit=limit,
     )
-    items = resp.get("Items", [])
-    items.sort(key=lambda x: x.get("createdAt", ""), reverse=True)
-    return [_item_to_request(i) for i in items]
+    return [_item_to_request(i) for i in resp.get("Items", [])]
 
 
 def update_request_progress(user_id: str, request_id: str, progress: float):
