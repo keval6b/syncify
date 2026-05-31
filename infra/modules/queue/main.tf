@@ -5,7 +5,7 @@ resource "aws_sqs_queue" "dlq" {
 
 resource "aws_sqs_queue" "sync" {
   name                       = "syncify-sync"
-  visibility_timeout_seconds = 900 # 15 min — must be >= worker Lambda timeout
+  visibility_timeout_seconds = 360 # 6 min: worker timeout (5 min) + 1 min buffer
 
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.dlq.arn

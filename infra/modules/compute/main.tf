@@ -28,8 +28,8 @@ resource "aws_lambda_function" "api" {
   runtime          = "python3.13"
   architectures    = ["arm64"]
   handler          = "syncify2.api.lambda_handler.handler"
-  timeout          = 29
-  memory_size      = 512
+  timeout          = 29 # API Gateway HTTP API caps integration timeout at 30s
+  memory_size      = 128
   filename         = data.archive_file.source.output_path
   source_code_hash = data.archive_file.source.output_base64sha256
   layers           = [var.lambda_layer_arn]
@@ -81,8 +81,8 @@ resource "aws_lambda_function" "worker" {
   runtime                        = "python3.13"
   architectures                  = ["arm64"]
   handler                        = "syncify2.worker.lambda_handler.handler"
-  timeout                        = 900 # 15 min
-  memory_size                    = 512
+  timeout                        = 300 # 5 min
+  memory_size                    = 128
   reserved_concurrent_executions = 1
   filename                       = data.archive_file.source.output_path
   source_code_hash               = data.archive_file.source.output_base64sha256
@@ -146,7 +146,7 @@ resource "aws_cloudwatch_metric_alarm" "worker_duration" {
   extended_statistic  = "p99"
   period              = 3600
   evaluation_periods  = 1
-  threshold           = 720000 # 12 min in ms
+  threshold           = 240000 # 4 min in ms (worker timeout is 5 min)
   comparison_operator = "GreaterThanOrEqualToThreshold"
   alarm_description   = "Worker sync approaching Lambda timeout"
   alarm_actions       = [aws_sns_topic.alarms.arn]
