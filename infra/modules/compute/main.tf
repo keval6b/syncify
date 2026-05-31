@@ -13,7 +13,7 @@ locals {
   }
 
   # Lambda source: zip the src/ directory (deps come from the layer)
-  source_dir  = "${path.root}/../../backend/src"
+  source_dir  = "${path.root}/../backend/src"
 }
 
 data "archive_file" "source" {
