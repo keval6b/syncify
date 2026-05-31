@@ -18,7 +18,7 @@ export const Route = createRootRoute({
               target="_blank"
               className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              keval_6b
+              keval6b
             </a>
           </p>
           <a
