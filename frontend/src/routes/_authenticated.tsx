@@ -2,9 +2,9 @@ import { createFileRoute, Navigate, Outlet } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ApiError, getUser } from "@/lib/api/queries.ts";
 import { LoaderCircle } from "lucide-react";
-import {useEffect} from "react";
+import { useEffect } from "react";
 import posthog from "posthog-js";
-import {toast} from "sonner";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated")({
   component: RouteComponent,

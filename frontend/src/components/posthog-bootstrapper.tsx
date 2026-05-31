@@ -1,12 +1,16 @@
-import {useEffect, useState} from "react";
-import {PostHogProvider} from "posthog-js/react";
+import { useEffect, useState } from "react";
+import { PostHogProvider } from "posthog-js/react";
 
 type PostHogConfig = {
   host: string | null;
   public_key: string | null;
 };
 
-export default function PostHogBootstrapper({ children }: { children: React.ReactNode }) {
+export default function PostHogBootstrapper({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [config, setConfig] = useState<PostHogConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
 

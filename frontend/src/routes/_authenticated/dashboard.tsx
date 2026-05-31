@@ -172,8 +172,8 @@ function Dashboard() {
                   {job.completed
                     ? `Completed ${relative_time(new Date(job.completed))}`
                     : job.progress === 0
-                    ? "Queued"
-                    : "Running"}
+                      ? "Queued"
+                      : "Running"}
                 </td>
                 <td className="px-4 py-2">
                   {job.progress === 0 && (
