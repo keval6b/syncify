@@ -42,7 +42,7 @@ export async function getJobs() {
   return (await response.json()) as SyncRequest[];
 }
 
-export async function deleteJob(id: number) {
+export async function deleteJob(id: string) {
   const response = await fetch(`/api/v1/jobs/${id}`, {
     method: "DELETE",
   });
@@ -84,7 +84,7 @@ export async function handleDeleteAccount() {
     method: "POST",
   });
   if (response.ok) {
-     window.location.assign("/")
+    window.location.assign("/");
   } else {
     await throwApiError(response);
   }

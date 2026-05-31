@@ -2,6 +2,7 @@
 /*.egg-info/
 /.venv/
 /data/
+/.idea/
 /.env
 /.cache
 __pycache__/

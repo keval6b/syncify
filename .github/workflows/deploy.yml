@@ -1,0 +1,104 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: eu-west-2
+  TF_VAR_spotify_client_id: ${{ secrets.SPOTIPY_CLIENT_ID }}
+  TF_VAR_spotify_client_secret: ${{ secrets.SPOTIPY_CLIENT_SECRET }}
+  TF_VAR_posthog_api_key: ${{ secrets.POSTHOG_API_KEY }}
+  TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm install -g pnpm
+          pnpm install --frozen-lockfile
+          pnpm run build
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Build Lambda dependency layer
+        working-directory: backend
+        run: |
+          uv export --no-dev --no-editable --no-emit-project -o /tmp/requirements.txt
+          pip install -r /tmp/requirements.txt \
+            --platform manylinux2014_aarch64 \
+            --implementation cp \
+            --python-version 3.13 \
+            --only-binary=:all: \
+            --target lambda_layer/python
+          zip -r ../lambda_layer.zip lambda_layer/
+
+      - name: Publish Lambda layer
+        id: layer
+        run: |
+          LAYER_ARN=$(aws lambda publish-layer-version \
+            --layer-name syncify-deps \
+            --zip-file fileb://lambda_layer.zip \
+            --compatible-runtimes python3.13 \
+            --compatible-architectures arm64 \
+            --query LayerVersionArn --output text)
+          echo "arn=$LAYER_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: Set base_uri from CloudFront domain
+        id: cf_domain
+        working-directory: infra
+        run: |
+          terraform init -input=false
+          DOMAIN=$(terraform output -raw cloudfront_domain 2>/dev/null || echo "")
+          if [ -n "$DOMAIN" ]; then
+            echo "TF_VAR_base_uri=https://$DOMAIN" >> "$GITHUB_ENV"
+          else
+            echo "TF_VAR_base_uri=https://placeholder.cloudfront.net" >> "$GITHUB_ENV"
+          fi
+
+      - name: Terraform apply
+        working-directory: infra
+        env:
+          TF_VAR_lambda_layer_arn: ${{ steps.layer.outputs.arn }}
+        run: |
+          terraform apply -auto-approve -input=false
+
+      - name: Update base_uri with real CloudFront domain
+        working-directory: infra
+        env:
+          TF_VAR_lambda_layer_arn: ${{ steps.layer.outputs.arn }}
+        run: |
+          DOMAIN=$(terraform output -raw cloudfront_domain)
+          echo "TF_VAR_base_uri=https://$DOMAIN" >> "$GITHUB_ENV"
+          terraform apply -auto-approve -input=false
+
+      - name: Sync frontend to S3
+        working-directory: infra
+        run: |
+          BUCKET=$(terraform output -raw s3_bucket_name)
+          aws s3 sync ../frontend/dist/ "s3://$BUCKET/" --delete
+
+      - name: Invalidate CloudFront cache
+        working-directory: infra
+        run: |
+          DIST_ID=$(terraform output -raw cloudfront_distribution_id)
+          aws cloudfront create-invalidation \
+            --distribution-id "$DIST_ID" \
+            --paths "/*"

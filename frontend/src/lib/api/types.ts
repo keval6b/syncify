@@ -1,10 +1,10 @@
 export interface SyncRequest {
-  id: number;
+  id: string;
   user_id: string;
   song_count: number;
   progress: number;
-  created: Date;
-  completed: Date | null;
+  created: string;
+  completed: string | null;
 }
 
 export interface User {
