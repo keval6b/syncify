@@ -1,18 +1,19 @@
-import {createFileRoute} from "@tanstack/react-router";
-import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   deleteJob,
   enqueueJob,
-  getJobs, handleDeleteAccount,
+  getJobs,
+  handleDeleteAccount,
   handleLogout,
 } from "@/lib/api/queries.ts";
-import {Button} from "@/components/ui/button.tsx";
-import {User} from "@/lib/api/types.ts";
-import {RefreshCcw, X} from "lucide-react";
-import {toast} from "sonner";
-import {Progress} from "@/components/ui/progress.tsx";
-import {relative_time} from "@/lib/utils.ts";
-import {useState} from "react";
+import { Button } from "@/components/ui/button.tsx";
+import { User } from "@/lib/api/types.ts";
+import { RefreshCcw, X } from "lucide-react";
+import { toast } from "sonner";
+import { Progress } from "@/components/ui/progress.tsx";
+import { relative_time } from "@/lib/utils.ts";
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -64,7 +65,7 @@ function Dashboard() {
     },
   });
 
-  async function handleDelete(jobId: number) {
+  async function handleDelete(jobId: string) {
     await deleteJob(jobId).catch((e) => toast(e.message));
     await queryClient.invalidateQueries({ queryKey: ["jobs"] });
   }
@@ -78,7 +79,12 @@ function Dashboard() {
             <>
               <Button
                 variant="link"
-                onClick={() => window.open(`https://open.spotify.com/user/${user.id}`, '_blank')}
+                onClick={() =>
+                  window.open(
+                    `https://open.spotify.com/user/${user.id}`,
+                    "_blank",
+                  )
+                }
               >
                 {user.display_name}
               </Button>
@@ -106,7 +112,8 @@ function Dashboard() {
           <DialogHeader>
             <DialogTitle>Delete account?</DialogTitle>
             <DialogDescription>
-              This action is permanent. It will remove your Syncify account and all associated data. You will need to log in again to recreate it.
+              This action is permanent. It will remove your Syncify account and
+              all associated data. You will need to log in again to recreate it.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
