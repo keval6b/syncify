@@ -184,8 +184,8 @@ class SyncSlotTakenError(Exception):
 def sync_slot(user_id: str):
     """Atomically claim the sync slot for the duration of the block.
     Raises SyncSlotTakenError if already claimed.
-    TTL is 20 min so a crashed Lambda auto-releases within one slot window."""
-    expiry = int((datetime.now(timezone.utc) + timedelta(minutes=20)).timestamp())
+    TTL is 30 min: 15 min Lambda timeout + 15 min buffer for DynamoDB TTL lag."""
+    expiry = int((datetime.now(timezone.utc) + timedelta(minutes=30)).timestamp())
     try:
         _requests_table.put_item(
             Item={"userId": user_id, "requestId": _LOCK_SK, "expiresAt": expiry},
