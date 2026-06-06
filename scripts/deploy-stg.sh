@@ -19,6 +19,28 @@ fi
 
 aws sts get-caller-identity --query Arn --output text >/dev/null
 
+echo "==> build lambda layer"
+uv export --no-dev --no-editable --no-emit-project \
+    -o /tmp/requirements.txt \
+    --project "$repo_root/backend" >/dev/null
+uv pip install -r /tmp/requirements.txt \
+    --python-platform manylinux2014_aarch64 \
+    --python 3.13 \
+    --only-binary=:all: \
+    --target "$repo_root/backend/lambda_layer/python" \
+    --quiet
+(cd "$repo_root/backend/lambda_layer" && zip -r "$repo_root/lambda_layer.zip" . -q)
+
+echo "==> publish lambda layer"
+layer_arn=$(aws lambda publish-layer-version \
+    --layer-name syncify-deps \
+    --zip-file "fileb://$repo_root/lambda_layer.zip" \
+    --compatible-runtimes python3.13 \
+    --compatible-architectures arm64 \
+    --query LayerVersionArn --output text)
+echo "    $layer_arn"
+sed -i "s|lambda_layer_arn = .*|lambda_layer_arn = \"$layer_arn\"|" "$repo_root/infra/stg.auto.tfvars"
+
 echo "==> tofu init (stg state key)"
 tofu -chdir=infra init -reconfigure -input=false \
     -backend-config="key=syncify-stg/terraform.tfstate" >/dev/null

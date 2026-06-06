@@ -1,4 +1,4 @@
-import uuid
+import uuid_utils
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
@@ -94,7 +94,7 @@ def _item_to_request(item: dict) -> SyncRequest:
 
 
 def create_request(user_id: str, song_count: int) -> SyncRequest:
-    request_id = str(uuid.uuid4())
+    request_id = str(uuid_utils.uuid7())
     created_at = _now()
     _requests_table.put_item(
         Item={
@@ -131,23 +131,20 @@ def get_pending_request(user_id: str) -> SyncRequest | None:
         FilterExpression=Attr("completedAt").not_exists(),
         ExpressionAttributeValues={":uid": user_id},
         ConsistentRead=True,
+        ScanIndexForward=True,
     )
-    items = resp.get("Items", [])
-    if not items:
-        return None
-    items.sort(key=lambda x: x.get("createdAt", ""))
-    return _item_to_request(items[0])
+    items = [i for i in resp.get("Items", []) if i["requestId"] != _LOCK_SK]
+    return _item_to_request(items[0]) if items else None
 
 
 def get_recent_requests(user_id: str, limit: int = 10) -> list[SyncRequest]:
     resp = _requests_table.query(
-        IndexName="byCreatedAt",
         KeyConditionExpression="userId = :uid",
         ExpressionAttributeValues={":uid": user_id},
         ScanIndexForward=False,
-        Limit=limit,
     )
-    return [_item_to_request(i) for i in resp.get("Items", [])]
+    items = [i for i in resp.get("Items", []) if i["requestId"] != _LOCK_SK]
+    return [_item_to_request(i) for i in items[:limit]]
 
 
 def _set_status(user_id: str, request_id: str, status: SyncStatus):
