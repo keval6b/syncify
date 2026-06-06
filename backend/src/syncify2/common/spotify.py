@@ -260,6 +260,17 @@ def sync(spotify: Spotify):
         liked = liked_future.result()
         existing = existing_future.result()
 
+    print(
+        json.dumps(
+            {
+                "event": "sync_fetched",
+                "liked_count": len(liked),
+                "existing_playlist_count": len(existing),
+                "existing_playlists": list(existing.keys()),
+            }
+        )
+    )
+
     chunks = [liked[i : i + _PLAYLIST_SIZE] for i in range(0, len(liked), _PLAYLIST_SIZE)]
     total = len(chunks)
 
@@ -281,22 +292,67 @@ def sync(spotify: Spotify):
         len(to_remove) + sum(len(i) for _, i in inserts)
         for _, to_remove, inserts in plans
     )
+    print(
+        json.dumps(
+            {
+                "event": "sync_planned",
+                "num_playlists": total,
+                "total_ops": total_ops,
+                "plan": [
+                    {
+                        "playlist_id": pid,
+                        "to_remove": len(rem),
+                        "to_insert": sum(len(i) for _, i in ins),
+                    }
+                    for pid, rem, ins in plans
+                ],
+            }
+        )
+    )
     if total_ops == 0:
         yield 1.0
         return
 
     done = 0
-    for playlist_id, to_remove, inserts in plans:
+    for plan_idx, (playlist_id, to_remove, inserts) in enumerate(plans):
+        playlist_ops = len(to_remove) + sum(len(i) for _, i in inserts)
+        print(
+            json.dumps(
+                {
+                    "event": "playlist_write_start",
+                    "playlist_idx": plan_idx,
+                    "playlist_id": playlist_id,
+                    "to_remove": len(to_remove),
+                    "to_insert": sum(len(i) for _, i in inserts),
+                    "playlist_ops": playlist_ops,
+                    "done_before": done,
+                    "total_ops": total_ops,
+                }
+            )
+        )
         for batch in _batches(to_remove, _API_PAGE):
             spotify.playlist_remove_all_occurrences_of_items(playlist_id, batch)
             done += len(batch)
+            print(json.dumps({"event": "batch_done", "op": "remove", "playlist_idx": plan_idx, "batch_size": len(batch), "done": done, "total_ops": total_ops}))
             yield done / total_ops
         for position, items in inserts:
             for batch in _batches(items, _API_PAGE):
                 spotify.playlist_add_items(playlist_id, batch, position=position)
                 position += len(batch)
                 done += len(batch)
+                print(json.dumps({"event": "batch_done", "op": "insert", "playlist_idx": plan_idx, "batch_size": len(batch), "done": done, "total_ops": total_ops}))
                 yield done / total_ops
+        print(
+            json.dumps(
+                {
+                    "event": "playlist_write_done",
+                    "playlist_idx": plan_idx,
+                    "playlist_id": playlist_id,
+                    "done": done,
+                    "total_ops": total_ops,
+                }
+            )
+        )
     yield 1.0
 
 

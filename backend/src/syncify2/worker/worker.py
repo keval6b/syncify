@@ -1,3 +1,6 @@
+import json
+import traceback
+
 import posthog
 
 from syncify2.common import spotify, db, scheduling
@@ -6,7 +9,11 @@ from syncify2.common import spotify, db, scheduling
 def run_for_user(user_id: str, request_id: str | None = None):
     if request_id:
         request = db.get_request(user_id, request_id)
-        if not request or request.completed:
+        if not request:
+            print(json.dumps({"event": "request_not_found", "user_id": user_id, "request_id": request_id}))
+            return
+        if request.completed:
+            print(json.dumps({"event": "request_already_completed", "user_id": user_id, "request_id": request_id}))
             return
         _sync(user_id, request, client=None)
     else:
@@ -58,7 +65,19 @@ def _sync(user_id: str, request: db.SyncRequest, client):
             properties={"song_count": count, "id": request.id},
         )
         print(f"Sync request {request.id} complete for {user_id}; {count} songs")
-    except Exception:
+    except Exception as exc:
+        print(
+            json.dumps(
+                {
+                    "event": "sync_failed",
+                    "user_id": user_id,
+                    "request_id": request.id,
+                    "error": type(exc).__name__,
+                    "detail": str(exc),
+                    "traceback": traceback.format_exc(),
+                }
+            )
+        )
         # Surface the failure to the user; re-raise so SQS still retries / DLQs.
         db.mark_request_failed(user_id, request.id)
         raise
