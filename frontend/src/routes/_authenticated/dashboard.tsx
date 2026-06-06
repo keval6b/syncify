@@ -8,10 +8,16 @@ import {
   handleLogout,
 } from "@/lib/api/queries.ts";
 import { Button } from "@/components/ui/button.tsx";
-import { User } from "@/lib/api/types.ts";
-import { RefreshCcw, X } from "lucide-react";
+import { SyncRequest, User } from "@/lib/api/types.ts";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  Loader2,
+  RefreshCcw,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
-import { Progress } from "@/components/ui/progress.tsx";
 import { relative_time } from "@/lib/utils.ts";
 import { useState } from "react";
 import {
@@ -28,6 +34,49 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
 });
 
+function JobStateCell({ job }: { job: SyncRequest }) {
+  const wrapper = "inline-flex items-center gap-2";
+  const iconClass = "h-4 w-4 shrink-0";
+  switch (job.status) {
+    case "pending":
+      return (
+        <span className={`${wrapper} text-muted-foreground`}>
+          <Clock className={iconClass} />
+          <span>Queued</span>
+        </span>
+      );
+    case "running":
+      return (
+        <span className={wrapper}>
+          <Loader2 className={`${iconClass} animate-spin`} />
+          <span>Running</span>
+        </span>
+      );
+    case "completed":
+      return (
+        <span className={wrapper}>
+          <CheckCircle2 className={iconClass} />
+          <span>
+            {job.completed
+              ? `Completed ${relative_time(new Date(job.completed))}`
+              : "Completed"}
+          </span>
+        </span>
+      );
+    case "failed":
+      return (
+        <span className={`${wrapper} text-destructive`}>
+          <AlertCircle className={iconClass} />
+          <span>
+            {job.completed
+              ? `Failed ${relative_time(new Date(job.completed))}`
+              : "Failed"}
+          </span>
+        </span>
+      );
+  }
+}
+
 function Dashboard() {
   const queryClient = useQueryClient();
   const user: User | undefined = queryClient.getQueryData(["user"]);
@@ -38,7 +87,9 @@ function Dashboard() {
     queryFn: getJobs,
     refetchInterval: (q) => {
       const jobs = q.state.data ?? [];
-      if (jobs.some((job) => !job.completed)) {
+      if (
+        jobs.some((job) => job.status === "pending" || job.status === "running")
+      ) {
         return 3000;
       }
       return 30000;
@@ -152,7 +203,6 @@ function Dashboard() {
               <th className="px-4 py-2 text-left">ID</th>
               <th className="px-4 py-2 text-left">Created</th>
               <th className="px-4 py-2 text-left">Song Count</th>
-              <th className="px-4 py-2 text-left">Progress</th>
               <th className="px-4 py-2 text-left">State</th>
               <th className="px-4 py-2 text-left">Actions</th>
             </tr>
@@ -166,17 +216,10 @@ function Dashboard() {
                 </td>
                 <td className="px-4 py-2">{job.song_count}</td>
                 <td className="px-4 py-2">
-                  <Progress value={job.completed ? 100 : job.progress * 100} />
+                  <JobStateCell job={job} />
                 </td>
                 <td className="px-4 py-2">
-                  {job.completed
-                    ? `Completed ${relative_time(new Date(job.completed))}`
-                    : job.progress === 0
-                      ? "Queued"
-                      : "Running"}
-                </td>
-                <td className="px-4 py-2">
-                  {job.progress === 0 && (
+                  {job.status === "pending" && (
                     <Button
                       variant="outline"
                       onClick={() => handleDelete(job.id)}

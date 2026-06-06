@@ -1,8 +1,8 @@
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
-from decimal import Decimal
 from datetime import datetime, timezone, timedelta
+from typing import Literal
 import boto3
 from boto3.dynamodb.conditions import Attr
 
@@ -19,12 +19,15 @@ class User:
     refresh_token: str
 
 
+SyncStatus = Literal["pending", "running", "completed", "failed"]
+
+
 @dataclass
 class SyncRequest:
     id: str
     user_id: str
     song_count: int
-    progress: float
+    status: SyncStatus
     created: str
     completed: str | None
 
@@ -76,11 +79,15 @@ def scan_all_users() -> list[User]:
 
 
 def _item_to_request(item: dict) -> SyncRequest:
+    # Fallback for rows written before the status migration: derive from completedAt.
+    status: SyncStatus = item.get("status") or (
+        "completed" if item.get("completedAt") else "pending"
+    )
     return SyncRequest(
         id=item["requestId"],
         user_id=item["userId"],
         song_count=int(item.get("songCount", 0)),
-        progress=float(item.get("progress", 0.0)),
+        status=status,
         created=item.get("createdAt", ""),
         completed=item.get("completedAt"),
     )
@@ -94,7 +101,7 @@ def create_request(user_id: str, song_count: int) -> SyncRequest:
             "userId": user_id,
             "requestId": request_id,
             "songCount": song_count,
-            "progress": 0,
+            "status": "pending",
             "createdAt": created_at,
             "expiresAt": _expiry_thirty_days(),
         }
@@ -103,7 +110,7 @@ def create_request(user_id: str, song_count: int) -> SyncRequest:
         id=request_id,
         user_id=user_id,
         song_count=song_count,
-        progress=0.0,
+        status="pending",
         created=created_at,
         completed=None,
     )
@@ -143,12 +150,22 @@ def get_recent_requests(user_id: str, limit: int = 10) -> list[SyncRequest]:
     return [_item_to_request(i) for i in resp.get("Items", [])]
 
 
-def update_request_progress(user_id: str, request_id: str, progress: float):
+def _set_status(user_id: str, request_id: str, status: SyncStatus):
+    # `status` is a DynamoDB reserved word, so it's aliased via ExpressionAttributeNames.
     _requests_table.update_item(
         Key={"userId": user_id, "requestId": request_id},
-        UpdateExpression="SET progress = :p",
-        ExpressionAttributeValues={":p": Decimal(str(progress))},
+        UpdateExpression="SET #s = :v",
+        ExpressionAttributeNames={"#s": "status"},
+        ExpressionAttributeValues={":v": status},
     )
+
+
+def mark_request_running(user_id: str, request_id: str):
+    _set_status(user_id, request_id, "running")
+
+
+def mark_request_failed(user_id: str, request_id: str):
+    _set_status(user_id, request_id, "failed")
 
 
 def update_request_song_count(user_id: str, request_id: str, song_count: int):
@@ -188,8 +205,9 @@ def sync_slot(user_id: str):
 def complete_request(user_id: str, request_id: str):
     _requests_table.update_item(
         Key={"userId": user_id, "requestId": request_id},
-        UpdateExpression="SET completedAt = :t",
-        ExpressionAttributeValues={":t": _now()},
+        UpdateExpression="SET completedAt = :t, #s = :v",
+        ExpressionAttributeNames={"#s": "status"},
+        ExpressionAttributeValues={":t": _now(), ":v": "completed"},
     )
 
 

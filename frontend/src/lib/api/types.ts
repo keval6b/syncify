@@ -1,8 +1,10 @@
+export type SyncStatus = "pending" | "running" | "completed" | "failed";
+
 export interface SyncRequest {
   id: string;
   user_id: string;
   song_count: number;
-  progress: number;
+  status: SyncStatus;
   created: string;
   completed: string | null;
 }

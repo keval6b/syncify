@@ -150,7 +150,7 @@ def jobs(request: Request):
 def delete_job(job_id: str, request: Request):
     user_id = session.get_user_id(request)
     sync_request = db.get_request(user_id, job_id)
-    if not sync_request or sync_request.progress != 0:
+    if not sync_request or sync_request.status != "pending":
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Job not found")
     db.delete_request(user_id, job_id)
     posthog.capture(
