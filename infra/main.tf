@@ -9,6 +9,20 @@ locals {
   name_prefix = local.environment == "prd" ? "syncify" : "syncify-${local.environment}"
 }
 
+# Sensitive config lives in SSM Parameter Store (SecureString), per environment,
+# not in GitHub. Terraform reads it at plan time via the AWS role.
+data "aws_ssm_parameter" "spotify_client_id" {
+  name = "/syncify/${local.environment}/spotify_client_id"
+}
+
+data "aws_ssm_parameter" "spotify_client_secret" {
+  name = "/syncify/${local.environment}/spotify_client_secret"
+}
+
+data "aws_ssm_parameter" "jwt_secret" {
+  name = "/syncify/${local.environment}/jwt_secret"
+}
+
 module "database" {
   source      = "./modules/database"
   name_prefix = local.name_prefix
@@ -40,8 +54,8 @@ module "compute" {
   dlq_arn       = module.queue.dlq_arn
 
   lambda_layer_arn      = var.lambda_layer_arn
-  spotify_client_id     = var.spotify_client_id
-  spotify_client_secret = var.spotify_client_secret
+  spotify_client_id     = data.aws_ssm_parameter.spotify_client_id.value
+  spotify_client_secret = data.aws_ssm_parameter.spotify_client_secret.value
   posthog_api_key       = var.posthog_api_key
-  jwt_secret            = var.jwt_secret
+  jwt_secret            = data.aws_ssm_parameter.jwt_secret.value
 }

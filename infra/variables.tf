@@ -11,19 +11,8 @@ variable "lambda_layer_arn" {
   description = "ARN of the published Lambda layer containing Python dependencies"
 }
 
-variable "spotify_client_id" {
-  sensitive = true
-}
-
-variable "spotify_client_secret" {
-  sensitive = true
-}
-
+# Spotify creds and the JWT secret now come from SSM (see data sources in
+# main.tf); only the non-sensitive PostHog key remains a Terraform variable.
 variable "posthog_api_key" {
-  sensitive = true
-  default   = ""
-}
-
-variable "jwt_secret" {
-  sensitive = true
+  default = ""
 }

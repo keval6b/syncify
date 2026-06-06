@@ -10,7 +10,6 @@ env:
 jobs:
   build-frontend:
     runs-on: ubuntu-latest
-    environment: prd
     steps:
       - uses: actions/checkout@v6
 
@@ -30,7 +29,6 @@ jobs:
 
   build-layer:
     runs-on: ubuntu-latest
-    environment: prd
     permissions:
       id-token: write
       contents: read
@@ -75,15 +73,11 @@ jobs:
   plan:
     needs: [build-layer]
     runs-on: ubuntu-latest
-    environment: prd
     permissions:
       id-token: write
       contents: read
     env:
-      TF_VAR_spotify_client_id: ${{ secrets.SPOTIPY_CLIENT_ID }}
-      TF_VAR_spotify_client_secret: ${{ secrets.SPOTIPY_CLIENT_SECRET }}
       TF_VAR_posthog_api_key: ${{ vars.POSTHOG_API_KEY }}
-      TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
       TF_VAR_lambda_layer_arn: ${{ needs.build-layer.outputs.layer_arn }}
     steps:
       - uses: actions/checkout@v6
@@ -126,12 +120,13 @@ jobs:
             infra/modules/compute/source.zip
           retention-days: 5
 
-  # Manual gate: the `prd-apply` environment has required reviewers, so this job
-  # waits for approval. It applies the exact plan reviewed above (no re-plan).
+  # Manual gate: the `prd` environment has required reviewers, so this job waits
+  # for approval and shows as "deploying to prd". It applies the exact plan
+  # reviewed above (no re-plan).
   apply:
     needs: [plan, build-frontend]
     runs-on: ubuntu-latest
-    environment: prd-apply
+    environment: prd
     permissions:
       id-token: write
       contents: read
