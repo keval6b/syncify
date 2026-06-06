@@ -70,8 +70,10 @@ jobs:
             --query LayerVersionArn --output text)
           echo "arn=$LAYER_ARN" >> "$GITHUB_OUTPUT"
 
-  deploy:
-    needs: [build-frontend, build-layer]
+  # Produce a plan and save it. This runs automatically so the diff is visible
+  # before anyone approves the apply.
+  plan:
+    needs: [build-layer]
     runs-on: ubuntu-latest
     environment: prd
     permissions:
@@ -92,29 +94,81 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - uses: opentofu/setup-opentofu@v2
+        with:
+          tofu_version: "1.12.0"
+
+      - name: OpenTofu plan
+        working-directory: infra
+        run: |
+          tofu init -input=false
+          tofu plan -input=false -out=tfplan
+
+      - name: Render plan to job summary
+        working-directory: infra
+        run: |
+          {
+            echo '## Terraform plan'
+            echo '```'
+            tofu show -no-color tfplan
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload plan
+        uses: actions/upload-artifact@v7
+        with:
+          name: tfplan
+          path: infra/tfplan
+          retention-days: 5
+
+  # Manual gate: the `prd-apply` environment has required reviewers, so this job
+  # waits for approval. It applies the exact plan reviewed above (no re-plan).
+  apply:
+    needs: [plan, build-frontend]
+    runs-on: ubuntu-latest
+    environment: prd-apply
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: tfplan
+          path: infra/
+
       - uses: actions/download-artifact@v7
         with:
           name: frontend-dist
           path: frontend/dist/
 
-      - uses: hashicorp/setup-terraform@v4
+      - uses: opentofu/setup-opentofu@v2
+        with:
+          tofu_version: "1.12.0"
 
-      - name: Terraform apply
+      - name: OpenTofu apply (saved plan)
         working-directory: infra
         run: |
-          terraform init -input=false
-          terraform apply -auto-approve -input=false
+          tofu init -input=false
+          tofu apply -input=false tfplan
 
       - name: Sync frontend to S3
         working-directory: infra
         run: |
-          BUCKET=$(terraform output -raw s3_bucket_name)
+          BUCKET=$(tofu output -raw s3_bucket_name)
           aws s3 sync ../frontend/dist/ "s3://$BUCKET/" --delete
 
       - name: Invalidate CloudFront cache
         working-directory: infra
         run: |
-          DIST_ID=$(terraform output -raw cloudfront_distribution_id)
+          DIST_ID=$(tofu output -raw cloudfront_distribution_id)
           aws cloudfront create-invalidation \
             --distribution-id "$DIST_ID" \
             --paths "/*"
