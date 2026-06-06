@@ -1,5 +1,5 @@
 resource "aws_dynamodb_table" "users" {
-  name         = "syncify-users"
+  name         = "${var.name_prefix}-users"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "userId"
 
@@ -10,7 +10,7 @@ resource "aws_dynamodb_table" "users" {
 }
 
 resource "aws_dynamodb_table" "sync_requests" {
-  name         = "syncify-sync-requests"
+  name         = "${var.name_prefix}-sync-requests"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "userId"
   range_key    = "requestId"

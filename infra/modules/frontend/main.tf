@@ -1,5 +1,5 @@
 resource "aws_s3_bucket" "spa" {
-  bucket_prefix = "syncify-spa-"
+  bucket_prefix = "${var.name_prefix}-spa-"
   force_destroy = true
 }
 
@@ -17,7 +17,7 @@ resource "aws_s3_bucket_public_access_block" "spa" {
 }
 
 resource "aws_cloudfront_origin_access_control" "spa" {
-  name                              = "syncify-spa-oac"
+  name                              = "${var.name_prefix}-spa-oac"
   origin_access_control_origin_type = "s3"
   signing_behavior                  = "always"
   signing_protocol                  = "sigv4"

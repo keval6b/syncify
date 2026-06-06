@@ -1,10 +1,10 @@
 resource "aws_sqs_queue" "dlq" {
-  name                      = "syncify-sync-dlq"
+  name                      = "${var.name_prefix}-sync-dlq"
   message_retention_seconds = 1209600 # 14 days
 }
 
 resource "aws_sqs_queue" "sync" {
-  name                       = "syncify-sync"
+  name                       = "${var.name_prefix}-sync"
   visibility_timeout_seconds = 360 # 6 min: worker timeout (5 min) + 1 min buffer
 
   redrive_policy = jsonencode({

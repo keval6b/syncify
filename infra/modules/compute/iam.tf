@@ -14,7 +14,7 @@ data "aws_iam_policy_document" "lambda_assume" {
 
 # --- API Lambda role ---
 resource "aws_iam_role" "api" {
-  name               = "syncify-api-lambda"
+  name               = "${var.name_prefix}-api-lambda"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume.json
 }
 
@@ -41,7 +41,7 @@ resource "aws_iam_role_policy" "api" {
       {
         Effect   = "Allow"
         Action   = ["scheduler:CreateSchedule", "scheduler:DeleteSchedule"]
-        Resource = "arn:aws:scheduler:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:schedule/syncify-users/*"
+        Resource = "arn:aws:scheduler:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:schedule/${var.name_prefix}-users/*"
       },
       {
         Effect   = "Allow"
@@ -54,7 +54,7 @@ resource "aws_iam_role_policy" "api" {
 
 # --- Worker Lambda role ---
 resource "aws_iam_role" "worker" {
-  name               = "syncify-worker-lambda"
+  name               = "${var.name_prefix}-worker-lambda"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume.json
 }
 
@@ -81,7 +81,7 @@ resource "aws_iam_role_policy" "worker" {
       {
         Effect   = "Allow"
         Action   = ["scheduler:DeleteSchedule"]
-        Resource = "arn:aws:scheduler:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:schedule/syncify-users/*"
+        Resource = "arn:aws:scheduler:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:schedule/${var.name_prefix}-users/*"
       },
     ]
   })
@@ -89,7 +89,7 @@ resource "aws_iam_role_policy" "worker" {
 
 # --- EventBridge Scheduler executor role (writes to SQS) ---
 resource "aws_iam_role" "schedule_executor" {
-  name = "syncify-schedule-executor"
+  name = "${var.name_prefix}-schedule-executor"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"

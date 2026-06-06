@@ -21,7 +21,7 @@ def _read_bool(name: str, default: bool = False) -> bool:
     return _read(name, default=str(default), optional=True).lower() == "true"
 
 
-# JWT secret — must be stable across Lambda invocations (set as env var in prod)
+# JWT secret — must be stable across Lambda invocations (set as env var in prd)
 jwt_secret = _read("JWT_SECRET", default=secrets.token_hex())
 
 # DynamoDB table names
@@ -32,8 +32,9 @@ requests_table = _read("REQUESTS_TABLE", "syncify-sync-requests")
 sqs_queue_url = _read("SQS_QUEUE_URL", optional=True)
 sqs_queue_arn = _read("SQS_QUEUE_ARN", optional=True)
 
-# EventBridge Scheduler executor role
+# EventBridge Scheduler executor role + schedule group (per environment)
 schedule_role_arn = _read("SCHEDULE_ROLE_ARN", optional=True)
+schedule_group = _read("SCHEDULE_GROUP", default="syncify-users", optional=True)
 
 # Analytics
 posthog.host = _read("POSTHOG_HOST", default="https://eu.i.posthog.com", optional=True)

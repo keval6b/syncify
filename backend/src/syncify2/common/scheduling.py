@@ -7,8 +7,6 @@ from syncify2.common import conf
 
 _scheduler = boto3.client("scheduler")
 
-SCHEDULE_GROUP = "syncify-users"
-
 
 def _schedule_name(user_id: str) -> str:
     return re.sub(r"[^a-zA-Z0-9_-]", "_", user_id)
@@ -18,7 +16,7 @@ def create_user_schedule(user_id: str):
     # Delete first so this is idempotent — also resets the 24h window on re-login.
     delete_user_schedule(user_id)
     _scheduler.create_schedule(
-        GroupName=SCHEDULE_GROUP,
+        GroupName=conf.schedule_group,
         Name=_schedule_name(user_id),
         ScheduleExpression="rate(24 hours)",
         FlexibleTimeWindow={"Mode": "FLEXIBLE", "MaximumWindowInMinutes": 60},
@@ -33,7 +31,7 @@ def create_user_schedule(user_id: str):
 def delete_user_schedule(user_id: str):
     try:
         _scheduler.delete_schedule(
-            GroupName=SCHEDULE_GROUP,
+            GroupName=conf.schedule_group,
             Name=_schedule_name(user_id),
         )
     except _scheduler.exceptions.ResourceNotFoundException:

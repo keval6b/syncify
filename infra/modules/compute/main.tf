@@ -9,6 +9,7 @@ locals {
     SQS_QUEUE_URL         = var.sqs_queue_url
     SQS_QUEUE_ARN         = var.sqs_queue_arn
     SCHEDULE_ROLE_ARN     = aws_iam_role.schedule_executor.arn
+    SCHEDULE_GROUP        = aws_scheduler_schedule_group.users.name
   }
 
   # Lambda source: zip the src/ directory (deps come from the layer)
@@ -23,18 +24,18 @@ data "archive_file" "source" {
 
 # --- CloudWatch Log Groups (created ahead of Lambdas to enforce retention) ---
 resource "aws_cloudwatch_log_group" "api" {
-  name              = "/aws/lambda/syncify-api"
+  name              = "/aws/lambda/${var.name_prefix}-api"
   retention_in_days = 90
 }
 
 resource "aws_cloudwatch_log_group" "worker" {
-  name              = "/aws/lambda/syncify-worker"
+  name              = "/aws/lambda/${var.name_prefix}-worker"
   retention_in_days = 90
 }
 
 # --- API Lambda ---
 resource "aws_lambda_function" "api" {
-  function_name    = "syncify-api"
+  function_name    = "${var.name_prefix}-api"
   role             = aws_iam_role.api.arn
   runtime          = "python3.13"
   architectures    = ["arm64"]
@@ -45,12 +46,12 @@ resource "aws_lambda_function" "api" {
   source_code_hash = data.archive_file.source.output_base64sha256
   layers           = [var.lambda_layer_arn]
   environment { variables = local.common_env }
-  depends_on       = [aws_cloudwatch_log_group.api]
+  depends_on = [aws_cloudwatch_log_group.api]
 }
 
 # --- API Gateway HTTP API ---
 resource "aws_apigatewayv2_api" "api" {
-  name          = "syncify-api"
+  name          = "${var.name_prefix}-api"
   protocol_type = "HTTP"
 }
 
@@ -88,7 +89,7 @@ resource "aws_lambda_permission" "apigw" {
 
 # --- Worker Lambda ---
 resource "aws_lambda_function" "worker" {
-  function_name                  = "syncify-worker"
+  function_name                  = "${var.name_prefix}-worker"
   role                           = aws_iam_role.worker.arn
   runtime                        = "python3.13"
   architectures                  = ["arm64"]
@@ -100,7 +101,7 @@ resource "aws_lambda_function" "worker" {
   source_code_hash               = data.archive_file.source.output_base64sha256
   layers                         = [var.lambda_layer_arn]
   environment { variables = local.common_env }
-  depends_on                     = [aws_cloudwatch_log_group.worker]
+  depends_on = [aws_cloudwatch_log_group.worker]
 }
 
 resource "aws_lambda_event_source_mapping" "worker_sqs" {
@@ -113,19 +114,19 @@ resource "aws_lambda_event_source_mapping" "worker_sqs" {
 
 # --- EventBridge Schedule Group (one schedule per user lives here) ---
 resource "aws_scheduler_schedule_group" "users" {
-  name = "syncify-users"
+  name = "${var.name_prefix}-users"
 }
 
 # --- CloudWatch Alarms ---
 resource "aws_sns_topic" "alarms" {
-  name = "syncify-alarms"
+  name = "${var.name_prefix}-alarms"
 }
 
 resource "aws_cloudwatch_metric_alarm" "dlq_depth" {
-  alarm_name          = "syncify-dlq-depth"
+  alarm_name          = "${var.name_prefix}-dlq-depth"
   namespace           = "AWS/SQS"
   metric_name         = "ApproximateNumberOfMessagesVisible"
-  dimensions          = { QueueName = "syncify-sync-dlq" }
+  dimensions          = { QueueName = "${var.name_prefix}-sync-dlq" }
   statistic           = "Sum"
   period              = 60
   evaluation_periods  = 1
@@ -137,7 +138,7 @@ resource "aws_cloudwatch_metric_alarm" "dlq_depth" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "api_errors" {
-  alarm_name          = "syncify-api-errors"
+  alarm_name          = "${var.name_prefix}-api-errors"
   namespace           = "AWS/Lambda"
   metric_name         = "Errors"
   dimensions          = { FunctionName = aws_lambda_function.api.function_name }
@@ -152,7 +153,7 @@ resource "aws_cloudwatch_metric_alarm" "api_errors" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "worker_duration" {
-  alarm_name          = "syncify-worker-duration"
+  alarm_name          = "${var.name_prefix}-worker-duration"
   namespace           = "AWS/Lambda"
   metric_name         = "Duration"
   dimensions          = { FunctionName = aws_lambda_function.worker.function_name }

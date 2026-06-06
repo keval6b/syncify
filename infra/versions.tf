@@ -25,7 +25,7 @@ provider "aws" {
   default_tags {
     tags = {
       service     = "syncify"
-      environment = var.environment
+      environment = local.environment
     }
   }
 }

@@ -3,7 +3,8 @@ variable "aws_region" {
 }
 
 variable "environment" {
-  default = "prd"
+  description = "Deployment environment: prd or stg. Drives the resource name prefix."
+  default     = "prd"
 }
 
 variable "lambda_layer_arn" {

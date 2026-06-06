@@ -1,3 +1,7 @@
+variable "name_prefix" {
+  description = "Prefix for resource names, e.g. syncify or syncify-stg"
+}
+
 variable "users_table_name" {}
 variable "users_table_arn" {}
 variable "requests_table_name" {}
