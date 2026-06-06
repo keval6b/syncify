@@ -114,11 +114,16 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload plan
+      # The saved plan references modules/compute/source.zip (built here by the
+      # archive_file data source). apply runs on a fresh runner, so the zip must
+      # travel with the plan or apply can't read the Lambda code to upload.
+      - name: Upload plan + Lambda package
         uses: actions/upload-artifact@v7
         with:
           name: tfplan
-          path: infra/tfplan
+          path: |
+            infra/tfplan
+            infra/modules/compute/source.zip
           retention-days: 5
 
   # Manual gate: the `prd-apply` environment has required reviewers, so this job
