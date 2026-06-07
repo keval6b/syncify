@@ -3,7 +3,7 @@ import { PostHogProvider } from "posthog-js/react";
 const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_API_KEY as string | undefined;
 const POSTHOG_HOST =
   (import.meta.env.VITE_POSTHOG_HOST as string | undefined) ??
-  "https://eu.i.posthog.com";
+  "https://t.kapdee.uk";
 
 export default function PostHogBootstrapper({
   children,

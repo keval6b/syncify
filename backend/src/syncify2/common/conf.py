@@ -37,6 +37,6 @@ schedule_role_arn = _read("SCHEDULE_ROLE_ARN", optional=True)
 schedule_group = _read("SCHEDULE_GROUP", default="syncify-users", optional=True)
 
 # Analytics
-posthog.host = _read("POSTHOG_HOST", default="https://eu.i.posthog.com", optional=True)
+posthog.host = _read("POSTHOG_HOST", default="https://t.kapdee.uk", optional=True)
 posthog.api_key = _read("POSTHOG_API_KEY", optional=True)
 posthog.debug = _read_bool("POSTHOG_DEBUG")
