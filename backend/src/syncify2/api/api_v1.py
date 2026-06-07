@@ -72,6 +72,10 @@ def callback(request: Request):
 
     db.put_user(db.User(id=user_id, refresh_token=token_response["refresh_token"]))
     scheduling.create_user_schedule(user_id)
+    posthog.identify(
+        user_id,
+        properties={"display_name": user.get("display_name")},
+    )
 
     redirect = RedirectResponse("/dashboard", status_code=status.HTTP_302_FOUND)
     _clear_cookie(redirect, session.COOKIE_OAUTH)

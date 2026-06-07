@@ -20,7 +20,9 @@ function RouteComponent() {
 
   useEffect(() => {
     if (!userQuery.data?.id) return;
-    posthog.identify(userQuery.data.id);
+    posthog.identify(userQuery.data.id, {
+      display_name: userQuery.data.display_name,
+    });
   }, [userQuery.data?.id]);
 
   useEffect(() => {
