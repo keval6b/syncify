@@ -81,6 +81,8 @@ function Dashboard() {
   const queryClient = useQueryClient();
   const user: User | undefined = queryClient.getQueryData(["user"]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [cancellingJobId, setCancellingJobId] = useState<string | null>(null);
 
   const jobsQuery = useQuery({
     queryKey: ["jobs"],
@@ -117,8 +119,10 @@ function Dashboard() {
   });
 
   async function handleDelete(jobId: string) {
+    setCancellingJobId(jobId);
     await deleteJob(jobId).catch((e) => toast(e.message));
     await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    setCancellingJobId(null);
   }
 
   return (
@@ -141,14 +145,18 @@ function Dashboard() {
               </Button>
               <Button
                 variant="ghost"
+                disabled={isLoggingOut}
                 onClick={async () => {
+                  setIsLoggingOut(true);
                   await handleLogout().catch(() => {
                     toast("Logout failed");
+                    setIsLoggingOut(false);
                   });
                   posthog.reset();
                   await queryClient.invalidateQueries({ queryKey: ["user"] });
                 }}
               >
+                {isLoggingOut && <Loader2 className="h-4 w-4 animate-spin" />}
                 Logout
               </Button>
               <Button variant="link" onClick={() => setDeleteDialogOpen(true)}>
@@ -180,6 +188,9 @@ function Dashboard() {
               onClick={() => deleteAccountMutation.mutate()}
               disabled={deleteAccountMutation.isPending}
             >
+              {deleteAccountMutation.isPending && (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              )}
               {deleteAccountMutation.isPending ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
@@ -187,13 +198,22 @@ function Dashboard() {
       </Dialog>
       <div className="flex flex-wrap items-center justify-end gap-4 mt-8">
         <p className="text-sm">Syncing every 24 hours</p>
-        <Button onClick={() => enqueueJobQuery.refetch()}>Enqueue Sync</Button>
+        <Button
+          disabled={enqueueJobQuery.isFetching}
+          onClick={() => enqueueJobQuery.refetch()}
+        >
+          {enqueueJobQuery.isFetching && (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          )}
+          Enqueue Sync
+        </Button>
         <Button
           variant="outline"
           disabled={jobsQuery.isFetching}
           onClick={() => jobsQuery.refetch()}
         >
-          <RefreshCcw /> Refresh
+          <RefreshCcw className={jobsQuery.isFetching ? "animate-spin" : ""} />
+          Refresh
         </Button>
       </div>
       <div className="overflow-x-auto">
@@ -222,9 +242,15 @@ function Dashboard() {
                   {job.status === "pending" && (
                     <Button
                       variant="outline"
+                      disabled={cancellingJobId === job.id}
                       onClick={() => handleDelete(job.id)}
                     >
-                      <X /> Cancel
+                      {cancellingJobId === job.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <X />
+                      )}
+                      Cancel
                     </Button>
                   )}
                 </td>

@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button.tsx";
 import { getUser, handleLogin } from "@/lib/api/queries.ts";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -9,6 +10,7 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const navigate = useNavigate();
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   useEffect(() => {
     getUser()
@@ -27,7 +29,16 @@ function Index() {
         <p className="text-center">
           Sync your Spotify 'Liked Songs' playlist to a sharable one.
         </p>
-        <Button onClick={handleLogin}>Login with Spotify</Button>
+        <Button
+          disabled={isLoggingIn}
+          onClick={() => {
+            setIsLoggingIn(true);
+            handleLogin().catch(() => setIsLoggingIn(false));
+          }}
+        >
+          {isLoggingIn && <Loader2 className="animate-spin" />}
+          Login with Spotify
+        </Button>
       </div>
     </main>
   );
