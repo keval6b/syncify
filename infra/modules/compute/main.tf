@@ -143,11 +143,11 @@ resource "aws_cloudwatch_metric_alarm" "api_errors" {
   metric_name         = "Errors"
   dimensions          = { FunctionName = aws_lambda_function.api.function_name }
   statistic           = "Sum"
-  period              = 300
-  evaluation_periods  = 2
-  threshold           = 5
+  period              = 60
+  evaluation_periods  = 1
+  threshold           = 1
   comparison_operator = "GreaterThanOrEqualToThreshold"
-  alarm_description   = "API Lambda error rate elevated"
+  alarm_description   = "API Lambda threw an error"
   alarm_actions       = [aws_sns_topic.alarms.arn]
   treat_missing_data  = "notBreaching"
 }
