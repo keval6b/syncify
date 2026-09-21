@@ -114,10 +114,10 @@ def get_client(user_id: str) -> Spotify | None:
 
 def _all_playlists(spotify: Spotify) -> list[dict]:
     results = spotify.current_user_playlists(limit=50, offset=0)
-    items = list(results["items"])
+    items = [p for p in results["items"] if p]
     while results["next"]:
         results = spotify.next(results)
-        items.extend(results["items"])
+        items.extend(p for p in results["items"] if p)
     return items
 
 

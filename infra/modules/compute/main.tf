@@ -20,6 +20,7 @@ data "archive_file" "source" {
   type        = "zip"
   source_dir  = local.source_dir
   output_path = "${path.module}/source.zip"
+  excludes = ["**/__pycache__", "**/__pycache__/**", "**/*.pyc"]
 }
 
 # --- CloudWatch Log Groups (created ahead of Lambdas to enforce retention) ---

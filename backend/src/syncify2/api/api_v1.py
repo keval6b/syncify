@@ -98,7 +98,8 @@ def get_user(request: Request):
     user = client.me()
     try:
         playlist_url = spotify.get_syncify_playlist_url(client)
-    except Exception:
+    except Exception as exc:
+        print(f"playlist_url lookup failed: {exc}")
         playlist_url = None
     return UserResponse(
         id=user["id"],
