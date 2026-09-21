@@ -1,0 +1,23 @@
+name: Test
+
+on:
+  pull_request:
+  workflow_call:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      AWS_DEFAULT_REGION: eu-west-2
+      AWS_ACCESS_KEY_ID: testing
+      AWS_SECRET_ACCESS_KEY: testing
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
+
+      - name: Run tests
+        run: uv run --group dev pytest

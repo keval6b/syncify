@@ -24,7 +24,7 @@ Fully serverless on AWS, running at roughly $1-5/month.
 - **Scheduling** — one EventBridge Schedule per user (rate 24h) feeds the SQS queue automatically; created on signup and deleted on account deletion or revoked Spotify access
 - **Database** — DynamoDB; sync request history expires after 1 year via TTL
 - **IaC** — Terraform in `infra/`
-- **CI/CD** — GitHub Actions deploys on push to `main` using OIDC (no stored AWS keys); frontend and Lambda layer builds run in parallel
+- **CI/CD** — PRs run `pytest`. Push to `main` auto-deploys staging, then production waits on the `prd` GitHub Environment approval. OIDC, no stored AWS keys.
 
 ## Deploying your own instance
 
@@ -41,7 +41,7 @@ Create an S3 bucket in your target region for Terraform state, then update the `
 
 ### 2. Create a GitHub Actions deploy role
 
-Create an IAM role trusted by GitHub Actions OIDC (`token.actions.githubusercontent.com`) and scoped to your repository and the `prd` environment. Attach the following AWS managed policies:
+Create an IAM role trusted by GitHub Actions OIDC (`token.actions.githubusercontent.com`) and scoped to your repository. The production apply job uses the `prd` environment; staging auto-apply uses `stg`. The deploy role's trust policy must allow both `repo:OWNER/REPO:environment:prd` and `repo:OWNER/REPO:environment:stg`. Attach the following AWS managed policies:
 
 - `AWSLambda_FullAccess`
 - `AmazonAPIGatewayAdministrator`
@@ -58,7 +58,7 @@ For IAM (needed to manage Lambda execution roles), attach a custom policy scoped
 
 ### 3. Configure GitHub environment secrets
 
-Create a `prd` environment in your GitHub repo settings and add the following secrets:
+Create a `prd` environment (required reviewers) and a `stg` environment (no reviewers) in your GitHub repo settings. Add the following to repository variables / the `prd` environment as you already do:
 
 | Secret | Description |
 |---|---|
@@ -70,7 +70,11 @@ Create a `prd` environment in your GitHub repo settings and add the following se
 
 ### 4. Deploy
 
-Push to `main`. The workflow builds the frontend (with PostHog key baked in as a `VITE_` variable) and the Lambda dependency layer in parallel, then runs `terraform apply`, syncs the frontend to S3, and invalidates the CloudFront cache.
+Push to `main`. GitHub Actions runs the test suite, publishes a Lambda layer, auto-applies the **staging** stack (`syncify-stg-*`, backend key `syncify-stg/terraform.tfstate`), and syncs a PostHog-free frontend to the staging bucket. Production uses the same commit: it plans against the prod state, then waits for `prd` environment approval before apply and a PostHog-keyed frontend sync.
+
+PRs run tests only; they do not deploy.
+
+`scripts/deploy-stg.sh` is still available for a local staging push from a dirty tree.
 
 ### 5. First-time setup after deploy
 

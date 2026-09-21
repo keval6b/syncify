@@ -4,30 +4,53 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
 env:
   AWS_REGION: eu-west-2
 
 jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+
   build-frontend:
+    needs: [test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
-      - name: Build frontend
+      - name: Install pnpm
         working-directory: frontend
-        env:
-          VITE_POSTHOG_API_KEY: ${{ vars.POSTHOG_API_KEY }}
         run: |
           npm install -g pnpm
           pnpm install --frozen-lockfile
-          pnpm run build
+
+      - name: Build staging frontend
+        working-directory: frontend
+        env:
+          VITE_POSTHOG_API_KEY: ""
+        run: pnpm run build
 
       - uses: actions/upload-artifact@v7
         with:
-          name: frontend-dist
+          name: frontend-dist-stg
+          path: frontend/dist/
+
+      - name: Build production frontend
+        working-directory: frontend
+        env:
+          VITE_POSTHOG_API_KEY: ${{ vars.POSTHOG_API_KEY }}
+        run: pnpm run build
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: frontend-dist-prd
           path: frontend/dist/
 
   build-layer:
+    needs: [test]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -68,15 +91,69 @@ jobs:
             --query LayerVersionArn --output text)
           echo "arn=$LAYER_ARN" >> "$GITHUB_OUTPUT"
 
+  deploy-stg:
+    needs: [test, build-layer, build-frontend]
+    runs-on: ubuntu-latest
+    # No required reviewers. The OIDC subject is environment:stg, so the deploy
+    # role trust must allow that (in addition to environment:prd).
+    environment: stg
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      TF_VAR_environment: stg
+      TF_VAR_lambda_layer_arn: ${{ needs.build-layer.outputs.layer_arn }}
+      TF_VAR_posthog_api_key: ""
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: frontend-dist-stg
+          path: frontend/dist/
+
+      - uses: opentofu/setup-opentofu@v2
+        with:
+          tofu_version: "1.12.0"
+
+      - name: OpenTofu apply (staging)
+        working-directory: infra
+        run: |
+          tofu init -input=false -reconfigure \
+            -backend-config="key=syncify-stg/terraform.tfstate"
+          tofu apply -input=false -auto-approve
+
+      - name: Sync frontend to S3
+        working-directory: infra
+        run: |
+          BUCKET=$(tofu output -raw s3_bucket_name)
+          aws s3 sync ../frontend/dist/ "s3://$BUCKET/" --delete
+
+      - name: Invalidate CloudFront cache
+        working-directory: infra
+        run: |
+          DIST_ID=$(tofu output -raw cloudfront_distribution_id)
+          aws cloudfront create-invalidation \
+            --distribution-id "$DIST_ID" \
+            --paths "/*"
+          echo "stg live at https://$(tofu output -raw cloudfront_domain)" >> "$GITHUB_STEP_SUMMARY"
+
   # Produce a plan and save it. This runs automatically so the diff is visible
   # before anyone approves the apply.
   plan:
-    needs: [build-layer]
+    needs: [test, build-layer]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
       contents: read
     env:
+      TF_VAR_environment: prd
       TF_VAR_posthog_api_key: ${{ vars.POSTHOG_API_KEY }}
       TF_VAR_lambda_layer_arn: ${{ needs.build-layer.outputs.layer_arn }}
     steps:
@@ -102,7 +179,7 @@ jobs:
         working-directory: infra
         run: |
           {
-            echo '## Terraform plan'
+            echo '## Terraform plan (prd)'
             echo '```'
             tofu show -no-color tfplan
             echo '```'
@@ -122,9 +199,9 @@ jobs:
 
   # Manual gate: the `prd` environment has required reviewers, so this job waits
   # for approval and shows as "deploying to prd". It applies the exact plan
-  # reviewed above (no re-plan).
+  # reviewed above (no re-plan). Staging must already be live.
   apply:
-    needs: [plan, build-frontend]
+    needs: [plan, build-frontend, deploy-stg]
     runs-on: ubuntu-latest
     environment: prd
     permissions:
@@ -146,7 +223,7 @@ jobs:
 
       - uses: actions/download-artifact@v7
         with:
-          name: frontend-dist
+          name: frontend-dist-prd
           path: frontend/dist/
 
       - uses: opentofu/setup-opentofu@v2
