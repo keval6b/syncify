@@ -96,7 +96,15 @@ def get_user(request: Request):
     if client is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not logged in")
     user = client.me()
-    return UserResponse(id=user["id"], display_name=user["display_name"])
+    try:
+        playlist_url = spotify.get_syncify_playlist_url(client)
+    except Exception:
+        playlist_url = None
+    return UserResponse(
+        id=user["id"],
+        display_name=user["display_name"],
+        playlist_url=playlist_url,
+    )
 
 
 @router.get("/auth/logout")

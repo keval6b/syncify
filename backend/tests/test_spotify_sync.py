@@ -323,3 +323,28 @@ def test_diff_transforms_current_into_target_for_random_mutations():
 def test_get_liked_count_matches_library_size():
     assert spotify.get_liked_count(FakeSpotify(liked=uris(137))) == 137
     assert spotify.get_liked_count(FakeSpotify(liked=[])) == 0
+
+
+def test_syncify_playlist_url_prefers_first_slice():
+    client = FakeSpotify(
+        playlists=[
+            {"id": "other", "name": "Discover Weekly"},
+            {"id": "pl-2", "name": "Syncify 2/2"},
+            {"id": "pl-1", "name": "Syncify 1/2"},
+        ]
+    )
+    assert spotify.get_syncify_playlist_url(client) == (
+        "https://open.spotify.com/playlist/pl-1"
+    )
+
+
+def test_syncify_playlist_url_falls_back_to_any_syncify_playlist():
+    client = FakeSpotify(playlists=[{"id": "pl-2", "name": "Syncify 2/2"}])
+    assert spotify.get_syncify_playlist_url(client) == (
+        "https://open.spotify.com/playlist/pl-2"
+    )
+
+
+def test_syncify_playlist_url_none_when_missing():
+    client = FakeSpotify(playlists=[{"id": "x", "name": "Liked mix"}])
+    assert spotify.get_syncify_playlist_url(client) is None

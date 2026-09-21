@@ -135,6 +135,28 @@ def get_playlist_id(spotify: Spotify, playlist_name):
     return playlist["id"]
 
 
+def get_syncify_playlist_url(spotify: Spotify) -> str | None:
+    """Spotify URL of the user's first Syncify playlist (1/N), if it exists."""
+    results = spotify.current_user_playlists(limit=50, offset=0)
+    fallback_id = None
+    while True:
+        for playlist in results["items"]:
+            name = playlist.get("name") or ""
+            playlist_id = playlist.get("id")
+            if not playlist_id:
+                continue
+            if name.startswith("Syncify 1/"):
+                return f"https://open.spotify.com/playlist/{playlist_id}"
+            if fallback_id is None and name.startswith("Syncify "):
+                fallback_id = playlist_id
+        if not results.get("next"):
+            break
+        results = spotify.next(results)
+    if fallback_id:
+        return f"https://open.spotify.com/playlist/{fallback_id}"
+    return None
+
+
 def _batches(items, size):
     for i in range(0, len(items), size):
         yield items[i : i + size]

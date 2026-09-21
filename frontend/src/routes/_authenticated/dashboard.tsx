@@ -13,6 +13,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
+  ExternalLink,
   Loader2,
   RefreshCcw,
   X,
@@ -239,20 +240,33 @@ function Dashboard() {
                   <JobStateCell job={job} />
                 </td>
                 <td className="px-4 py-2">
-                  {job.status === "pending" && (
+                  <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
-                      disabled={cancellingJobId === job.id}
-                      onClick={() => handleDelete(job.id)}
+                      disabled={!user?.playlist_url}
+                      onClick={() => {
+                        if (!user?.playlist_url) return;
+                        window.open(user.playlist_url, "_blank", "noopener,noreferrer");
+                      }}
                     >
-                      {cancellingJobId === job.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <X />
-                      )}
-                      Cancel
+                      <ExternalLink />
+                      Open
                     </Button>
-                  )}
+                    {job.status === "pending" && (
+                      <Button
+                        variant="outline"
+                        disabled={cancellingJobId === job.id}
+                        onClick={() => handleDelete(job.id)}
+                      >
+                        {cancellingJobId === job.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <X />
+                        )}
+                        Cancel
+                      </Button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
