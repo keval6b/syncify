@@ -59,8 +59,8 @@ def put_user(user: User):
 
 
 def delete_user(user_id: str):
-    _users_table.delete_item(Key={"userId": user_id})
     _delete_all_requests(user_id)
+    _users_table.delete_item(Key={"userId": user_id})
 
 
 def scan_all_users() -> list[User]:
