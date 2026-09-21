@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Deploy the current working tree to the syncify-stg-* stack:
+# Deploy the current working tree to the syncify-stg-* stack.
+# Staging also auto-deploys from GitHub Actions on push to main; use this script
+# for a dirty local tree.
 #   1. tofu apply against the staging state key (in-place updates to the two Lambdas)
 #   2. build the frontend (no PostHog so stg events don't pollute prod analytics)
 #   3. sync the dist/ bundle to the stg SPA bucket and invalidate CloudFront
