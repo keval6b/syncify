@@ -9,6 +9,9 @@
 
 set -euo pipefail
 
+export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-eu-west-2}"
+export AWS_REGION="${AWS_REGION:-eu-west-2}"
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
@@ -39,7 +42,11 @@ layer_arn=$(aws lambda publish-layer-version \
     --compatible-architectures arm64 \
     --query LayerVersionArn --output text)
 echo "    $layer_arn"
-sed -i "s|lambda_layer_arn = .*|lambda_layer_arn = \"$layer_arn\"|" "$repo_root/infra/stg.auto.tfvars"
+if sed --version >/dev/null 2>&1; then
+    sed -i "s|lambda_layer_arn = .*|lambda_layer_arn = \"$layer_arn\"|" "$repo_root/infra/stg.auto.tfvars"
+else
+    sed -i '' "s|lambda_layer_arn = .*|lambda_layer_arn = \"$layer_arn\"|" "$repo_root/infra/stg.auto.tfvars"
+fi
 
 echo "==> tofu init (stg state key)"
 tofu -chdir=infra init -reconfigure -input=false \

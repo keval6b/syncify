@@ -12,4 +12,5 @@ export interface SyncRequest {
 export interface User {
   id: string;
   display_name: string;
+  playlist_url: string | null;
 }

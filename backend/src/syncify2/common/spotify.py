@@ -112,18 +112,19 @@ def get_client(user_id: str) -> Spotify | None:
     return Spotify(response.get("access_token"), requests_session=_build_session())
 
 
-def get_playlist_id(spotify: Spotify, playlist_name):
+def _all_playlists(spotify: Spotify) -> list[dict]:
     results = spotify.current_user_playlists(limit=50, offset=0)
-
-    for playlist in results["items"]:
-        if playlist["name"] == playlist_name:
-            return playlist["id"]
-
+    items = [p for p in results["items"] if p]
     while results["next"]:
         results = spotify.next(results)
-        for playlist in results["items"]:
-            if playlist["name"] == playlist_name:
-                return playlist["id"]
+        items.extend(p for p in results["items"] if p)
+    return items
+
+
+def get_playlist_id(spotify: Spotify, playlist_name):
+    for playlist in _all_playlists(spotify):
+        if playlist["name"] == playlist_name:
+            return playlist["id"]
 
     user = spotify.current_user()
     playlist = spotify.user_playlist_create(
@@ -133,6 +134,26 @@ def get_playlist_id(spotify: Spotify, playlist_name):
         description="A copy of this user's liked songs",
     )
     return playlist["id"]
+
+
+def get_syncify_playlist_url(spotify: Spotify) -> str | None:
+    """Spotify URL of the user's first Syncify playlist (1/N), if it exists.
+
+    Does not create a playlist (unlike get_playlist_id).
+    """
+    fallback_id = None
+    for playlist in _all_playlists(spotify):
+        name = playlist.get("name") or ""
+        playlist_id = playlist.get("id")
+        if not playlist_id:
+            continue
+        if name.startswith("Syncify 1/"):
+            return f"https://open.spotify.com/playlist/{playlist_id}"
+        if fallback_id is None and name.startswith("Syncify "):
+            fallback_id = playlist_id
+    if fallback_id:
+        return f"https://open.spotify.com/playlist/{fallback_id}"
+    return None
 
 
 def _batches(items, size):
@@ -147,15 +168,6 @@ def _all_saved_track_uris(spotify: Spotify) -> list[str]:
         results = spotify.next(results)
         uris.extend(t["track"]["uri"] for t in results["items"] if t.get("track"))
     return uris
-
-
-def _all_playlists(spotify: Spotify) -> list[dict]:
-    results = spotify.current_user_playlists(limit=50, offset=0)
-    items = list(results["items"])
-    while results["next"]:
-        results = spotify.next(results)
-        items.extend(results["items"])
-    return items
 
 
 def _playlist_track_uris(spotify: Spotify, playlist_id: str) -> list[str]:
