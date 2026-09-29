@@ -32,6 +32,10 @@ requests_table = _read("REQUESTS_TABLE", "syncify-sync-requests")
 sqs_queue_url = _read("SQS_QUEUE_URL", optional=True)
 sqs_queue_arn = _read("SQS_QUEUE_ARN", optional=True)
 
+# Durable sync worker. The SQS function starts this execution by name.
+durable_function_name = _read("DURABLE_FUNCTION_NAME", optional=True)
+checkpoint_bucket = _read("CHECKPOINT_BUCKET", optional=True)
+
 # EventBridge Scheduler executor role + schedule group (per environment)
 schedule_role_arn = _read("SCHEDULE_ROLE_ARN", optional=True)
 schedule_group = _read("SCHEDULE_GROUP", default="syncify-users", optional=True)

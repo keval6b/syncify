@@ -48,6 +48,14 @@ resource "aws_iam_role_policy" "api" {
         Action   = ["iam:PassRole"]
         Resource = aws_iam_role.schedule_executor.arn
       },
+      {
+        Effect   = "Allow"
+        Action   = ["lambda:StopDurableExecution"]
+        Resource = [
+          "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.name_prefix}-sync",
+          "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${var.name_prefix}-sync:*",
+        ]
+      },
     ]
   })
 }
@@ -82,6 +90,29 @@ resource "aws_iam_role_policy" "worker" {
         Effect   = "Allow"
         Action   = ["scheduler:DeleteSchedule"]
         Resource = "arn:aws:scheduler:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:schedule/${var.name_prefix}-users/*"
+      },
+      {
+        Effect = "Allow"
+        Action = ["lambda:InvokeFunction"]
+        Resource = [
+          aws_lambda_function.sync.arn,
+          aws_lambda_alias.sync.arn,
+        ]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["lambda:CheckpointDurableExecution", "lambda:GetDurableExecutionState"]
+        Resource = "${aws_lambda_function.sync.arn}:*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket"]
+        Resource = aws_s3_bucket.checkpoints.arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["s3:GetObject", "s3:PutObject"]
+        Resource = "${aws_s3_bucket.checkpoints.arn}/*"
       },
     ]
   })

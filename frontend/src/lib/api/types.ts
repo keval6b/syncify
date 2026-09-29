@@ -7,6 +7,7 @@ export interface SyncRequest {
   status: SyncStatus;
   created: string;
   completed: string | null;
+  phase?: string | null;
 }
 
 export interface User {

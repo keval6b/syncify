@@ -34,6 +34,18 @@ wheels = [
 ]
 
 [[package]]
+name = "aws-durable-execution-sdk-python"
+version = "2.0.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "boto3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ab/0c/debdd86f78e823964195ae13ea90b800137878f04b826f453211abd479ff/aws_durable_execution_sdk_python-2.0.1.tar.gz", hash = "sha256:2ad9b8748d0f33d258b16a76ab6b7469057a0d1fdacfea153c232465c3f032bd", size = 320348, upload-time = "2026-09-18T22:16:27.302Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f5/10/c7869c434939b9c57f11b7b02bb59e65542703243a3a1c0aec41a8c7a2d8/aws_durable_execution_sdk_python-2.0.1-py3-none-any.whl", hash = "sha256:2d223b2b5b8aaf97149bde94bcb3472780318ea4dc3a2d17260585a2d5b2368c", size = 132932, upload-time = "2026-09-18T22:16:25.654Z" },
+]
+
+[[package]]
 name = "backoff"
 version = "2.2.1"
 source = { registry = "https://pypi.org/simple" }
@@ -578,6 +590,7 @@ name = "syncify"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "aws-durable-execution-sdk-python" },
     { name = "boto3" },
     { name = "fastapi" },
     { name = "mangum" },
@@ -595,6 +608,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aws-durable-execution-sdk-python", specifier = "~=2.0.1" },
     { name = "boto3", specifier = "~=1.43.18" },
     { name = "fastapi", specifier = "~=0.136.3" },
     { name = "mangum", specifier = "~=0.21.0" },

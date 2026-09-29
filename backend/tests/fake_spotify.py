@@ -33,6 +33,13 @@ class FakeSpotify:
 
     def current_user_saved_tracks(self, limit=50, offset=0):
         self.calls.append(("current_user_saved_tracks", limit, offset))
+        if offset:
+            chunk = self.liked[offset : offset + limit]
+            return {
+                "items": [{"track": {"uri": uri}} for uri in chunk],
+                "total": len(self.liked),
+                "next": None,
+            }
         return _paginate(self.liked, limit, lambda uri: {"track": {"uri": uri}})
 
     # --- playlists ---
@@ -56,8 +63,16 @@ class FakeSpotify:
 
     def playlist_items(self, playlist_id, limit=100, offset=0, fields=None):
         self.calls.append(("playlist_items", playlist_id, limit, offset))
+        items = self.contents.get(playlist_id, [])
+        if offset:
+            chunk = items[offset : offset + limit]
+            return {
+                "items": [{"track": {"uri": uri}} for uri in chunk],
+                "total": len(items),
+                "next": None,
+            }
         return _paginate(
-            self.contents.get(playlist_id, []),
+            items,
             limit,
             lambda uri: {"track": {"uri": uri}},
         )

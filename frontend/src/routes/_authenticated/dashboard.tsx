@@ -35,6 +35,21 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
 });
 
+function phaseLabel(phase: string | null | undefined) {
+  switch (phase) {
+    case "fetch_liked":
+      return "Fetching liked songs";
+    case "fetch_playlists":
+      return "Fetching playlists";
+    case "plan":
+      return "Planning";
+    case "apply":
+      return "Writing";
+    default:
+      return "Running";
+  }
+}
+
 function JobStateCell({ job }: { job: SyncRequest }) {
   const wrapper = "inline-flex items-center gap-2";
   const iconClass = "h-4 w-4 shrink-0";
@@ -50,7 +65,7 @@ function JobStateCell({ job }: { job: SyncRequest }) {
       return (
         <span className={wrapper}>
           <Loader2 className={`${iconClass} animate-spin`} />
-          <span>Running</span>
+          <span>{phaseLabel(job.phase)}</span>
         </span>
       );
     case "completed":
@@ -246,13 +261,17 @@ function Dashboard() {
                       disabled={!user?.playlist_url}
                       onClick={() => {
                         if (!user?.playlist_url) return;
-                        window.open(user.playlist_url, "_blank", "noopener,noreferrer");
+                        window.open(
+                          user.playlist_url,
+                          "_blank",
+                          "noopener,noreferrer",
+                        );
                       }}
                     >
                       <ExternalLink />
                       Open
                     </Button>
-                    {job.status === "pending" && (
+                    {(job.status === "pending" || job.status === "running") && (
                       <Button
                         variant="outline"
                         disabled={cancellingJobId === job.id}

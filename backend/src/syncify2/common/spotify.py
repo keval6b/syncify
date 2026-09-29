@@ -17,6 +17,16 @@ _API_PAGE = 100  # max items per add / remove / playlist_items page
 # Spotify rate-limits aggressively on large libraries. spotipy retries 429s
 # internally and silently, so we instrument the retry path to surface them.
 _RETRY_STATUSES = (429, 500, 502, 503, 504)
+# Longer than this and the durable execution waits outside the Lambda.
+_LONG_RETRY_AFTER_SECONDS = 5
+
+
+class SpotifyRateLimited(Exception):
+    """Spotify asked us to wait longer than a slice should sleep."""
+
+    def __init__(self, retry_after: float):
+        self.retry_after = max(1, int(float(retry_after)))
+        super().__init__(f"spotify rate limited for {self.retry_after}s")
 
 
 def _emit_429(retry_after, url):
@@ -57,6 +67,8 @@ class _LoggingRetry(Retry):
             if headers is not None:
                 retry_after = headers.get("Retry-After")
             _emit_429(retry_after, url)
+            if retry_after is not None and float(retry_after) > _LONG_RETRY_AFTER_SECONDS:
+                raise SpotifyRateLimited(retry_after)
         return super().increment(
             method=method, url=url, response=response, error=error, **kwargs
         )
@@ -154,6 +166,22 @@ def get_syncify_playlist_url(spotify: Spotify) -> str | None:
     if fallback_id:
         return f"https://open.spotify.com/playlist/{fallback_id}"
     return None
+
+
+def add_items_idempotent(spotify: Spotify, playlist_id: str, uris: list[str], position: int):
+    """Add tracks unless this batch is already present at `position`.
+
+    A slice retry can run after Spotify accepted the write and before the
+    cursor advanced. Playlists allow duplicates, so a blind retry would
+    insert the batch twice.
+    """
+    if not uris:
+        return
+    page = spotify.playlist_items(playlist_id, limit=len(uris), offset=position)
+    have = [item["track"]["uri"] for item in page["items"] if item.get("track")]
+    if have[: len(uris)] == list(uris):
+        return
+    spotify.playlist_add_items(playlist_id, uris, position=position)
 
 
 def _batches(items, size):

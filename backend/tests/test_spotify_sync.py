@@ -348,3 +348,26 @@ def test_syncify_playlist_url_falls_back_to_any_syncify_playlist():
 def test_syncify_playlist_url_none_when_missing():
     client = FakeSpotify(playlists=[{"id": "x", "name": "Liked mix"}])
     assert spotify.get_syncify_playlist_url(client) is None
+
+
+def test_retried_insert_skips_uris_already_at_that_position():
+    batch = uris(3)
+    client = FakeSpotify()
+    client.contents["pl"] = ["pad"] * 100 + batch
+
+    spotify.add_items_idempotent(client, "pl", batch, 100)
+
+    assert client.calls_named("playlist_add_items") == []
+    assert client.contents["pl"] == ["pad"] * 100 + batch
+
+
+def test_insert_still_writes_when_the_position_differs():
+    batch = uris(2)
+    client = FakeSpotify()
+    client.contents["pl"] = ["other", "track"]
+
+    spotify.add_items_idempotent(client, "pl", batch, 0)
+
+    assert client.calls_named("playlist_add_items") == [
+        ("playlist_add_items", "pl", 2, 0)
+    ]

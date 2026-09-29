@@ -1,9 +1,11 @@
+from dataclasses import asdict
 import json
 import secrets
 
 import boto3
 import posthog
 import spotipy
+from botocore.exceptions import ClientError
 from fastapi import Request, HTTPException, APIRouter
 from starlette import status
 from starlette.responses import Response, RedirectResponse
@@ -16,6 +18,7 @@ from syncify2.api.types import UserResponse
 router = APIRouter(prefix="/api/v1", tags=["API v1"])
 
 _sqs = boto3.client("sqs")
+_lambda = boto3.client("lambda")
 
 
 def _set_session_cookie(response: Response, token: str, cookie_name: str, max_age: int):
@@ -135,18 +138,25 @@ def enqueue(request: Request):
         return
 
     try:
-        with db.sync_slot(user_id):
-            sync_request = db.create_request(user_id, count)
-            _sqs.send_message(
-                QueueUrl=conf.sqs_queue_url,
-                MessageBody=json.dumps(
-                    {"user_id": user_id, "request_id": sync_request.id}
-                ),
-            )
+        db.claim_sync_slot(user_id)
     except db.SyncSlotTakenError:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, "You already have a pending sync request"
         )
+    sync_request = None
+    try:
+        sync_request = db.create_request(user_id, count)
+        _sqs.send_message(
+            QueueUrl=conf.sqs_queue_url,
+            MessageBody=json.dumps(
+                {"user_id": user_id, "request_id": sync_request.id}
+            ),
+        )
+    except Exception:
+        db.release_sync_slot(user_id)
+        if sync_request is not None:
+            db.delete_request(user_id, sync_request.id)
+        raise
     posthog.capture(
         "enqueued_sync_request",
         distinct_id=user_id,
@@ -157,16 +167,27 @@ def enqueue(request: Request):
 @router.get("/jobs")
 def jobs(request: Request):
     user_id = session.get_user_id(request)
-    return db.get_recent_requests(user_id)
+    return [
+        {key: value for key, value in asdict(job).items() if key != "execution_arn"}
+        for job in db.get_recent_requests(user_id)
+    ]
 
 
 @router.delete("/jobs/{job_id}")
 def delete_job(job_id: str, request: Request):
     user_id = session.get_user_id(request)
     sync_request = db.get_request(user_id, job_id)
-    if not sync_request or sync_request.status != "pending":
+    if not sync_request or sync_request.status not in ("pending", "running"):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Job not found")
-    db.delete_request(user_id, job_id)
+    if sync_request.execution_arn:
+        try:
+            _lambda.stop_durable_execution(
+                DurableExecutionArn=sync_request.execution_arn,
+                Error={"ErrorMessage": "Cancelled", "ErrorType": "Cancelled"},
+            )
+        except ClientError:
+            pass
+    db.mark_request_failed(user_id, job_id)
     posthog.capture(
         "deleted_sync_request", distinct_id=user_id, properties={"id": job_id}
     )

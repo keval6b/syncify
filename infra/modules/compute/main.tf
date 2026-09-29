@@ -10,7 +10,12 @@ locals {
     SQS_QUEUE_ARN         = var.sqs_queue_arn
     SCHEDULE_ROLE_ARN     = aws_iam_role.schedule_executor.arn
     SCHEDULE_GROUP        = aws_scheduler_schedule_group.users.name
+    CHECKPOINT_BUCKET     = aws_s3_bucket.checkpoints.bucket
   }
+
+  worker_env = merge(local.common_env, {
+    DURABLE_FUNCTION_NAME = aws_lambda_alias.sync.arn
+  })
 
   # Lambda source: zip the src/ directory (deps come from the layer)
   source_dir = "${path.root}/../backend/src"
@@ -31,6 +36,11 @@ resource "aws_cloudwatch_log_group" "api" {
 
 resource "aws_cloudwatch_log_group" "worker" {
   name              = "/aws/lambda/${var.name_prefix}-worker"
+  retention_in_days = 90
+}
+
+resource "aws_cloudwatch_log_group" "sync" {
+  name              = "/aws/lambda/${var.name_prefix}-sync"
   retention_in_days = 90
 }
 
@@ -88,21 +98,80 @@ resource "aws_lambda_permission" "apigw" {
   source_arn    = "${aws_apigatewayv2_api.api.execution_arn}/*/*"
 }
 
-# --- Worker Lambda ---
+# SQS invokes this function. It only starts the durable execution; the mapping
+# itself cannot host an execution longer than 15 minutes.
 resource "aws_lambda_function" "worker" {
-  function_name                  = "${var.name_prefix}-worker"
-  role                           = aws_iam_role.worker.arn
-  runtime                        = "python3.13"
-  architectures                  = ["arm64"]
-  handler                        = "syncify2.worker.lambda_handler.handler"
-  timeout                        = 900 # 15 min
-  memory_size                    = 128
-  reserved_concurrent_executions = 1
-  filename                       = data.archive_file.source.output_path
-  source_code_hash               = data.archive_file.source.output_base64sha256
-  layers                         = [var.lambda_layer_arn]
-  environment { variables = local.common_env }
+  function_name    = "${var.name_prefix}-worker"
+  role             = aws_iam_role.worker.arn
+  runtime          = "python3.13"
+  architectures    = ["arm64"]
+  handler          = "syncify2.worker.lambda_handler.handler"
+  timeout          = 30
+  memory_size      = 128
+  filename         = data.archive_file.source.output_path
+  source_code_hash = data.archive_file.source.output_base64sha256
+  layers           = [var.lambda_layer_arn]
+  environment { variables = local.worker_env }
   depends_on = [aws_cloudwatch_log_group.worker]
+}
+
+resource "aws_lambda_function" "sync" {
+  function_name    = "${var.name_prefix}-sync"
+  role             = aws_iam_role.worker.arn
+  runtime          = "python3.13"
+  architectures    = ["arm64"]
+  handler          = "syncify2.worker.durable_handler.handler"
+  timeout          = 900
+  memory_size      = 128
+  filename         = data.archive_file.source.output_path
+  source_code_hash = data.archive_file.source.output_base64sha256
+  layers           = [var.lambda_layer_arn]
+  publish          = true
+  environment { variables = local.common_env }
+
+  durable_config {
+    execution_timeout = 21600
+    retention_period  = 1
+  }
+
+  timeouts {
+    delete = "60m"
+  }
+
+  depends_on = [aws_cloudwatch_log_group.sync]
+}
+
+resource "aws_lambda_alias" "sync" {
+  name             = "live"
+  function_name    = aws_lambda_function.sync.function_name
+  function_version = aws_lambda_function.sync.version
+}
+
+resource "aws_s3_bucket" "checkpoints" {
+  bucket = "${var.name_prefix}-checkpoints-${data.aws_caller_identity.current.account_id}"
+}
+
+resource "aws_s3_bucket_public_access_block" "checkpoints" {
+  bucket                  = aws_s3_bucket.checkpoints.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "checkpoints" {
+  bucket = aws_s3_bucket.checkpoints.id
+
+  rule {
+    id     = "expire-slices"
+    status = "Enabled"
+
+    filter {}
+
+    expiration {
+      days = 7
+    }
+  }
 }
 
 resource "aws_lambda_event_source_mapping" "worker_sqs" {
@@ -153,17 +222,17 @@ resource "aws_cloudwatch_metric_alarm" "api_errors" {
   treat_missing_data  = "notBreaching"
 }
 
-resource "aws_cloudwatch_metric_alarm" "worker_duration" {
-  alarm_name          = "${var.name_prefix}-worker-duration"
+resource "aws_cloudwatch_metric_alarm" "sync_failures" {
+  alarm_name          = "${var.name_prefix}-sync-failures"
   namespace           = "AWS/Lambda"
-  metric_name         = "Duration"
-  dimensions          = { FunctionName = aws_lambda_function.worker.function_name }
-  extended_statistic  = "p99"
-  period              = 3600
+  metric_name         = "Errors"
+  dimensions          = { FunctionName = aws_lambda_function.sync.function_name }
+  statistic           = "Sum"
+  period              = 60
   evaluation_periods  = 1
-  threshold           = 720000 # 12 min in ms (worker timeout is 15 min)
+  threshold           = 1
   comparison_operator = "GreaterThanOrEqualToThreshold"
-  alarm_description   = "Worker sync approaching Lambda timeout"
+  alarm_description   = "Durable sync execution failed"
   alarm_actions       = [aws_sns_topic.alarms.arn]
   treat_missing_data  = "notBreaching"
 }

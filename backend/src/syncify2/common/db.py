@@ -30,6 +30,8 @@ class SyncRequest:
     status: SyncStatus
     created: str
     completed: str | None
+    phase: str | None = None
+    execution_arn: str | None = None
 
 
 def _now() -> str:
@@ -90,6 +92,8 @@ def _item_to_request(item: dict) -> SyncRequest:
         status=status,
         created=item.get("createdAt", ""),
         completed=item.get("completedAt"),
+        phase=item.get("phase"),
+        execution_arn=item.get("executionArn"),
     )
 
 
@@ -162,7 +166,20 @@ def mark_request_running(user_id: str, request_id: str):
 
 
 def mark_request_failed(user_id: str, request_id: str):
-    _set_status(user_id, request_id, "failed")
+    _update_existing(
+        user_id,
+        request_id,
+        "SET #s = :v, completedAt = :t",
+        {
+            ":v": "failed",
+            ":t": _now(),
+            ":pending": "pending",
+            ":running": "running",
+        },
+        names={"#s": "status"},
+        condition="attribute_exists(requestId) AND (#s = :pending OR #s = :running)",
+    )
+    release_sync_slot(user_id)
 
 
 def update_request_song_count(user_id: str, request_id: str, song_count: int):
@@ -180,32 +197,120 @@ class SyncSlotTakenError(Exception):
     pass
 
 
-@contextmanager
-def sync_slot(user_id: str):
-    """Atomically claim the sync slot for the duration of the block.
-    Raises SyncSlotTakenError if already claimed.
-    TTL is 30 min: 15 min Lambda timeout + 15 min buffer for DynamoDB TTL lag."""
-    expiry = int((datetime.now(timezone.utc) + timedelta(minutes=30)).timestamp())
+# Held until the durable execution finishes. DynamoDB TTL is the backstop if
+# the execution is killed without releasing the slot.
+_LOCK_TTL = timedelta(hours=6)
+
+
+def claim_sync_slot(user_id: str):
+    """Claim the per-user sync slot. Raises SyncSlotTakenError if it is held."""
+    now = int(datetime.now(timezone.utc).timestamp())
+    expiry = now + int(_LOCK_TTL.total_seconds())
     try:
         _requests_table.put_item(
             Item={"userId": user_id, "requestId": _LOCK_SK, "expiresAt": expiry},
-            ConditionExpression="attribute_not_exists(requestId)",
+            ConditionExpression="attribute_not_exists(requestId) OR expiresAt < :now",
+            ExpressionAttributeValues={":now": now},
         )
     except _requests_table.meta.client.exceptions.ConditionalCheckFailedException:
         raise SyncSlotTakenError
+
+
+def release_sync_slot(user_id: str):
+    _requests_table.delete_item(Key={"userId": user_id, "requestId": _LOCK_SK})
+
+
+@contextmanager
+def sync_slot(user_id: str):
+    """Claim the sync slot for the duration of the block.
+
+    The enqueue and worker paths hold the slot themselves and release it when
+    the durable execution completes. This wrapper is for short critical sections.
+    """
+    claim_sync_slot(user_id)
     try:
         yield
     finally:
-        _requests_table.delete_item(Key={"userId": user_id, "requestId": _LOCK_SK})
+        release_sync_slot(user_id)
+
+
+def _update_existing(
+    user_id: str,
+    request_id: str,
+    expression: str,
+    values: dict,
+    names: dict | None = None,
+    condition: str = "attribute_exists(requestId)",
+):
+    kwargs = {
+        "Key": {"userId": user_id, "requestId": request_id},
+        "UpdateExpression": expression,
+        "ExpressionAttributeValues": values,
+        "ConditionExpression": condition,
+    }
+    if names:
+        kwargs["ExpressionAttributeNames"] = names
+    try:
+        _requests_table.update_item(**kwargs)
+    except _requests_table.meta.client.exceptions.ConditionalCheckFailedException:
+        return False
+    return True
+
+
+def set_execution_arn(user_id: str, request_id: str, execution_arn: str):
+    _update_existing(
+        user_id,
+        request_id,
+        "SET executionArn = :a",
+        {":a": execution_arn},
+    )
+
+
+def save_progress(
+    user_id: str,
+    request_id: str,
+    *,
+    phase: str,
+    liked_offset: int,
+    liked_total: int,
+    playlist_index: int,
+    playlist_offset: int,
+    batch_index: int,
+):
+    """Persist the small cursor. URI lists live in the slice object, not here."""
+    return _update_existing(
+        user_id,
+        request_id,
+        "SET phase = :p, #s = :running, #c = :c",
+        {
+            ":p": phase,
+            ":running": "running",
+            ":pending": "pending",
+            ":c": {
+                "phase": phase,
+                "likedOffset": liked_offset,
+                "likedTotal": liked_total,
+                "playlistIndex": playlist_index,
+                "playlistOffset": playlist_offset,
+                "batchIndex": batch_index,
+            },
+        },
+        names={"#s": "status", "#c": "cursor"},
+        condition="attribute_exists(requestId) AND (#s = :pending OR #s = :running)",
+    )
 
 
 def complete_request(user_id: str, request_id: str):
-    _requests_table.update_item(
-        Key={"userId": user_id, "requestId": request_id},
-        UpdateExpression="SET completedAt = :t, #s = :v",
-        ExpressionAttributeNames={"#s": "status"},
-        ExpressionAttributeValues={":t": _now(), ":v": "completed"},
+    updated = _update_existing(
+        user_id,
+        request_id,
+        "SET completedAt = :t, #s = :v",
+        {":t": _now(), ":v": "completed", ":pending": "pending", ":running": "running"},
+        names={"#s": "status"},
+        condition="attribute_exists(requestId) AND (#s = :pending OR #s = :running)",
     )
+    if updated:
+        release_sync_slot(user_id)
 
 
 def delete_request(user_id: str, request_id: str):
