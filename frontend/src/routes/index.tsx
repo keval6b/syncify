@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button.tsx";
-import { getUser, handleLogin } from "@/lib/api/queries.ts";
+import { ApiError, getUser, handleLogin } from "@/lib/api/queries.ts";
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 
@@ -13,14 +13,22 @@ function Index() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     getUser()
       .then((user) => {
-        if (user) {
-          navigate({ to: "/dashboard" }).then();
+        if (!cancelled && user) {
+          navigate({ to: "/dashboard" });
         }
       })
-      .catch();
-  }, []);
+      .catch((error: unknown) => {
+        // Logged-out visitors are the normal case; the API answers 401.
+        if (error instanceof ApiError && error.status === 401) return;
+        throw error;
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate]);
 
   return (
     <main className="flex-1 flex justify-center items-center">
