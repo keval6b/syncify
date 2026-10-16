@@ -5,7 +5,29 @@ resource "aws_s3_bucket" "spa" {
 
 resource "aws_s3_bucket_versioning" "spa" {
   bucket = aws_s3_bucket.spa.id
-  versioning_configuration { status = "Enabled" }
+  # Suspended is the off state. S3 cannot return a bucket to unversioned.
+  versioning_configuration { status = "Suspended" }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "spa" {
+  bucket = aws_s3_bucket.spa.id
+
+  rule {
+    id     = "expire-old-versions"
+    status = "Enabled"
+
+    filter {}
+
+    noncurrent_version_expiration {
+      noncurrent_days = 30
+    }
+
+    expiration {
+      expired_object_delete_marker = true
+    }
+  }
+
+  depends_on = [aws_s3_bucket_versioning.spa]
 }
 
 resource "aws_s3_bucket_public_access_block" "spa" {
